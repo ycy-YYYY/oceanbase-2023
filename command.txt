@@ -1,0 +1,20 @@
+# sysbench 测试
+obd test sysbench obcluster --time=14 --threads=5 --tables=4 --table-size=10863 --database=test --tenant=test --script-name=oltp_point_select
+
+# TPC-C测试
+obd test tpcc obcluster --tenant=test --database=test --terminals=10 --run-mins=1 --warehouses=1 --optimization=0
+
+# TPC-H测试
+obd test tpch obcluster --tenant=test --database=test --remote-tbl-dir=/data/obcluster/tbl --scale-factor=1 --optimization=0
+
+# 在TPC-CH前执行
+mysql -S /root/obcluster/run/sql.sock -uroot@test -e "SET GLOBAL secure_file_priv = '/'"
+mysql -S /root/obcluster/run/sql.sock -uroot@test -e "SET GLOBAL ob_query_timeout = 60000000"
+
+# release
+sh build.sh release --init --make
+python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_release/src/observer/observer
+
+# debug
+sh build.sh debug --init --make
+python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_debug/src/observer/observer
