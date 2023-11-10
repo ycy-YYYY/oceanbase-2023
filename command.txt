@@ -32,6 +32,4 @@ python3 mydeploy.py --cluster-home-path /root/obcluster --clean
 mysql -uroot -h127.0.0.1 -P2881
 
 # BOOTSTRAP command
-set global ob_query_timeout=36000000000;
-set global ob_trx_timeout=36000000000;
 ALTER SYSTEM BOOTSTRAP ZONE '1' SERVER '127.0.0.1:2882';
