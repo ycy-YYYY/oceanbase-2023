@@ -15,6 +15,22 @@ mysql -S /root/obcluster/run/sql.sock -uroot@test -e "SET GLOBAL ob_query_timeou
 sh build.sh release --init --make
 python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_release/src/observer/observer
 
+# release only build env
+python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_release/src/observer/observer --only_build_env 
+
 # debug
 sh build.sh debug --init --make
 python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_debug/src/observer/observer
+
+# debug only build env
+python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_debug/src/observer/observer --only_build_env
+
+# clean (clear all data and kill all process)
+python3 mydeploy.py --cluster-home-path /root/obcluster --clean
+
+# mysql client
+
+# BOOTSTRAP command
+set global ob_query_timeout=36000000000;
+set global ob_trx_timeout=36000000000;
+ALTER SYSTEM BOOTSTRAP ZONE '1' SERVER '127.0.0.1:2882';

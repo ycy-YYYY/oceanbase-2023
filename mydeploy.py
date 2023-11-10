@@ -21,6 +21,9 @@ def __data_path(cluster_home_path:str) -> str:
 def __observer_bin_path(cluster_home_path:str) -> str:
     return os.path.join(cluster_home_path, 'bin', 'observer')
 
+def __observer_bin_dir(cluster_home_path:str) -> str:
+    return os.path.join(cluster_home_path, 'bin')
+
 def __build_env(cluster_home_path:str) -> None:
     paths_to_create = ['clog', 'sstable', 'slog']
     data_path = __data_path(cluster_home_path)
@@ -90,8 +93,8 @@ if __name__ == "__main__":
     parser.add_argument("-c", dest="cluster_id", type=str, default="1")
     parser.add_argument("-i", dest="devname", type=str, default="lo")
     parser.add_argument("-I", dest="ip", type=str, default="127.0.0.1")
-    parser.add_argument("-o", dest="opt_str", type=str, default="__min_full_resource_pool_memory=1073741824,datafile_size=60G,datafile_next=20G,datafile_maxsize=100G,log_disk_size=40G,memory_limit=10G,system_memory=1G,cpu_count=24,cache_wash_threshold=1G,workers_per_cpu_quota=10,schema_history_expire_time=1d,net_thread_count=4,syslog_io_bandwidth_limit=10G")
-    parser.add_argument("-b", dest="bin", type=str)
+    parser.add_argument("-o", dest="opt_str", type=str, default="__min_full_resource_pool_memory=1073741824,datafile_size=2G,datafile_next=2G,datafile_maxsize=8G,log_disk_size=40G,memory_limit=10G,system_memory=1G,cpu_count=24,cache_wash_threshold=1G,workers_per_cpu_quota=10,schema_history_expire_time=1d,net_thread_count=4,syslog_io_bandwidth_limit=10G")
+    parser.add_argument("-b", dest="bin", type=str, default="observer")
 
     tenant_group = parser.add_argument_group('tenant', 'tenant options')
     tenant_group.add_argument('--tenant-name', dest='tenant_name', type=str, default='test')
@@ -107,7 +110,8 @@ if __name__ == "__main__":
         exit(1)
 
     home_abs_path = os.path.abspath(args.cluster_home_path)
-    bin_abs_path = os.path.abspath(args.bin)
+    
+    
     data_abs_path = os.path.abspath(__data_path(args.cluster_home_path))
 
     if args.clean:
@@ -116,9 +120,19 @@ if __name__ == "__main__":
 
     __build_env(home_abs_path)
 
+    bin_dir_abs_path = __observer_bin_dir(home_abs_path)
+    # copy observer to bin_abs_dir, if bin_abs_dir exists, remove it first , mkdir bin_abs_dir and copy observer to bin_abs_dir
+    
+    bin_abs_path = __observer_bin_path(home_abs_path)
+    if os.path.exists(bin_dir_abs_path):
+        shutil.rmtree(bin_dir_abs_path)
+    os.makedirs(bin_dir_abs_path, exist_ok=True)
+    shutil.copy(args.bin, bin_abs_path)
+
     rootservice = f'{args.ip}:{args.rpc_port}'
     observer_args = f"-p {args.mysql_port} -P {args.rpc_port} -z {args.zone} -c {args.cluster_id} -d {data_abs_path} -i {args.devname} -r {rootservice} -I {args.ip} -o {args.opt_str}"
-
+    
+    
     os.chdir(args.cluster_home_path)
     observer_cmd = f"{bin_abs_path} {observer_args}"
     _logger.info(observer_cmd)
@@ -130,6 +144,9 @@ if __name__ == "__main__":
         db = __try_to_connect(args.ip, int(args.mysql_port))
         cursor = db.cursor(cursor=mysql.cursors.DictCursor)
         _logger.info(f'connect to server success! host={args.ip}, port={args.mysql_port}')
+        
+        if args.only_build_env:
+            exit(0)
 
         bootstrap_begin = datetime.datetime.now()
         cursor.execute(f"ALTER SYSTEM BOOTSTRAP ZONE '{args.zone}' SERVER '{rootservice}'")
