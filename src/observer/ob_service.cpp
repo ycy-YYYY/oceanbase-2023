@@ -10,6 +10,9 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
+#include "share/ob_rpc_struct.h"
+#include <cstdint>
 #define USING_LOG_PREFIX SERVER
 
 #include "observer/ob_service.h"
@@ -1404,6 +1407,7 @@ int ObService::bootstrap(const obrpc::ObBootstrapArg &arg)
 {
   int ret = OB_SUCCESS;
   const int64_t timeout = 600 * 1000 * 1000LL; // 10 minutes
+  int64_t begin_ts = ObTimeUtility::current_time();
   const obrpc::ObServerInfoList &rs_list = arg.server_list_;
   LOG_INFO("bootstrap timeout", K(timeout), "worker_timeout_ts", THIS_WORKER.get_timeout_ts());
   if (!inited_) {
@@ -1431,6 +1435,7 @@ int ObService::bootstrap(const obrpc::ObBootstrapArg &arg)
     } else if (OB_FAIL(pre_bootstrap.prepare_bootstrap(master_rs))) {
       BOOTSTRAP_LOG(ERROR, "failed to prepare boot strap", K(rs_list), K(ret));
     } else {
+      LOG_INFO("succeed to prepare bootstrap", K(rs_list), K(master_rs));
       const ObCommonRpcProxy &rpc_proxy = *gctx_.rs_rpc_proxy_;
       bool boot_done = false;
       const int64_t MAX_RETRY_COUNT = 30;
@@ -1440,6 +1445,8 @@ int ObService::bootstrap(const obrpc::ObBootstrapArg &arg)
         if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
           rpc_timeout = max(rpc_timeout, THIS_WORKER.get_timeout_remain());
         }
+        LOG_INFO("start to do_boot_strap", K(rs_list), K(master_rs), K(rpc_timeout));
+        
         if (OB_FAIL(rpc_proxy.to_addr(master_rs).timeout(rpc_timeout)
                     .execute_bootstrap(arg))) {
           if (OB_RS_NOT_MASTER == ret) {
@@ -1460,7 +1467,7 @@ int ObService::bootstrap(const obrpc::ObBootstrapArg &arg)
       }
     }
   }
-
+  
   return ret;
 }
 

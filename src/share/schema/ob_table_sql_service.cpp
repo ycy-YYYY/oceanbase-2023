@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include <cstdint>
 #define USING_LOG_PREFIX SHARE_SCHEMA
 #include "ob_table_sql_service.h"
 #include "lib/oblog/ob_log.h"

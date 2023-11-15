@@ -10,6 +10,9 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
+#include "storage/tx/ob_dup_table_base.h"
+#include <cstdint>
 #define USING_LOG_PREFIX BOOTSTRAP
 
 #include "rootserver/ob_bootstrap.h"
@@ -241,6 +244,8 @@ int ObPreBootstrap::prepare_bootstrap(ObAddr &master_rs)
   bool is_empty = false;
   bool match = false;
   begin_ts_ = ObTimeUtility::current_time();
+  int64_t begin_ts = ObTimeUtility::current_time();
+  LOG_INFO("start do prepare_bootstrap");
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("check_inner_stat failed", KR(ret));
   } else if (OB_FAIL(check_bootstrap_rs_list(rs_list_))) {
@@ -267,6 +272,8 @@ int ObPreBootstrap::prepare_bootstrap(ObAddr &master_rs)
     LOG_WARN("failed to wait elect master partition", KR(ret));
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  int64_t end_ts = ObTimeUtility::current_time();
+  LOG_INFO("prepare bootstrap success",K(ret),"costYcy", end_ts - begin_ts);
   return ret;
 }
 
@@ -386,6 +393,7 @@ int ObPreBootstrap::notify_sys_tenant_config_()
 int ObPreBootstrap::create_ls()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("fail to check inner stat", KR(ret));
   } else {
@@ -404,6 +412,7 @@ int ObPreBootstrap::create_ls()
     LOG_WARN("create ls failed.", K(ret));
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("create ls success", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -411,6 +420,7 @@ int ObPreBootstrap::wait_elect_ls(
     common::ObAddr &master_rs)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const uint64_t tenant_id = OB_SYS_TENANT_ID;
 
   int64_t timeout = WAIT_ELECT_SYS_LEADER_TIMEOUT_US;
@@ -429,6 +439,7 @@ int ObPreBootstrap::wait_elect_ls(
     LOG_INFO("succeed to wait elect log stream");
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("wait elect log stream success", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -552,7 +563,7 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
   bool already_bootstrap = true;
   ObSArray<ObTableSchema> table_schemas;
   begin_ts_ = ObTimeUtility::current_time();
-
+  int64_t begin_ts = ObTimeUtility::current_time();
   BOOTSTRAP_LOG(INFO, "start do execute_bootstrap");
 
   if (OB_FAIL(check_inner_stat())) {
@@ -600,6 +611,7 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
   }
 
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish execute bootstrap", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -715,7 +727,7 @@ int ObBootstrap::prepare_create_partition(
 int ObBootstrap::create_all_core_table_partition()
 {
   int ret = OB_SUCCESS;
-
+  int64_t begin_ts = ObTimeUtility::current_time(); 
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("check_inner_stat failed", K(ret));
   } else {
@@ -755,6 +767,7 @@ int ObBootstrap::create_all_core_table_partition()
 
   LOG_INFO("finish creating all core table", K(ret));
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish creating all core table", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -837,6 +850,7 @@ int ObBootstrap::add_sys_table_lob_aux_table(
 int ObBootstrap::construct_all_schema(ObIArray<ObTableSchema> &table_schemas)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const schema_create_func *creator_ptr_arrays[] = {
     core_table_schema_creators,
     sys_table_schema_creators,
@@ -890,12 +904,14 @@ int ObBootstrap::construct_all_schema(ObIArray<ObTableSchema> &table_schemas)
     }
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish construct all schema", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
 int ObBootstrap::broadcast_sys_schema(const ObSArray<ObTableSchema> &table_schemas)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   obrpc::ObBatchBroadcastSchemaArg arg;
   obrpc::ObBatchBroadcastSchemaResult result;
   if (OB_FAIL(check_inner_stat())) {
@@ -938,6 +954,7 @@ int ObBootstrap::broadcast_sys_schema(const ObSArray<ObTableSchema> &table_schem
     } // end for
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish broadcast sys schema", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -993,6 +1010,7 @@ int ObBootstrap::create_all_schema(ObDDLService &ddl_service,
   }
   LOG_INFO("end create all schemas", K(ret), "table count", table_schemas.count(),
            "time_used", ObTimeUtility::current_time() - begin_time);
+  LOG_INFO("finish create all schema", K(ret), "costYcy", ObTimeUtility::current_time() - begin_time);
   return ret;
 }
 

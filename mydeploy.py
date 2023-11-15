@@ -37,7 +37,7 @@ def __clear_env(cluster_home_path:str) -> None:
     if pid:
         subprocess.run(f'kill -9 {pid}', shell=True)
 
-    paths_to_clear = ['audit', 'etc', 'etc2', 'etc3', 'log', 'run', __data_path(cluster_home_path)]
+    paths_to_clear = ['audit', 'etc', 'etc2', 'etc3', 'log', 'run', 'bin', __data_path(cluster_home_path)]
     for path in paths_to_clear:
         path_to_clear = os.path.join(cluster_home_path, path)
         shutil.rmtree(path_to_clear, ignore_errors=True)
