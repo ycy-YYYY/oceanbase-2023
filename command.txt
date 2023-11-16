@@ -12,14 +12,14 @@ mysql -S /root/obcluster/run/sql.sock -uroot@test -e "SET GLOBAL secure_file_pri
 mysql -S /root/obcluster/run/sql.sock -uroot@test -e "SET GLOBAL ob_query_timeout = 60000000"
 
 # release
-sh build.sh release --init --make
+bash build.sh release -DOB_USE_CCACHE=ON --make -j2
 python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_release/src/observer/observer
 
 # release only build env
 python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_release/src/observer/observer --only_build_env 
 
 # debug
-sh build.sh debug --init --make
+bash build.sh debug -DOB_USE_CCACHE=ON --make -j2
 python3 mydeploy.py --cluster-home-path /root/obcluster -b /root/source/oceanbase/build_debug/src/observer/observer
 
 # debug only build env

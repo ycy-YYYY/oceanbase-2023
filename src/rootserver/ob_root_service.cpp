@@ -1084,7 +1084,7 @@ int ObRootService::start_service()
       FLOG_WARN("fail to set rs status", KR(ret));
     } else if (OB_FAIL(schedule_refresh_server_timer_task(0))) {
       FLOG_WARN("failed to schedule refresh_server task", KR(ret));
-    } else if (OB_FAIL(schedule_restart_timer_task(0))) {
+    } else if (OB_FAIL(schedule_restart_timer_task(1000000))) {
       FLOG_WARN("failed to schedule restart task", KR(ret));
     } else if (OB_FAIL(schema_service_->get_ddl_epoch_mgr().remove_all_ddl_epoch())) {
       FLOG_WARN("fail to remove ddl epoch", KR(ret));
@@ -1961,6 +1961,8 @@ int ObRootService::execute_bootstrap(const obrpc::ObBootstrapArg &arg)
     LOG_WARN("lst_operator_ ptr is null", KR(ret), KP(lst_operator_));
   } else {
     update_cpu_quota_concurrency_in_memory_();
+    // stop all timer tasks
+    stop_restart_timer_tasks();
     // avoid bootstrap and do_restart run concurrently
     FLOG_INFO("[ROOTSERVICE_NOTICE] try to get lock for bootstrap in execute_bootstrap");
     ObLatchWGuard guard(bootstrap_lock_, ObLatchIds::RS_BOOTSTRAP_LOCK);
@@ -5431,6 +5433,17 @@ int ObRootService::stop_timer_tasks()
 
   //stop other timer tasks here
   LOG_INFO("stop all timer tasks finish", K(ret));
+  return ret;
+}
+
+int ObRootService::stop_restart_timer_tasks(){
+  int ret = OB_SUCCESS;
+  if (!inited_) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not init", K(ret));
+  } else {
+    task_queue_.cancel_timer_task(restart_task_);
+  }
   return ret;
 }
 

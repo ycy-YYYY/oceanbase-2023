@@ -829,6 +829,7 @@ private:
   int init_sequence_id();
   int start_timer_tasks();
   int stop_timer_tasks();
+  int stop_restart_timer_tasks();
   int request_heartbeats();
   int self_check();
   int update_all_server_and_rslist();

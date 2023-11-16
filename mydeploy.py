@@ -152,6 +152,7 @@ if __name__ == "__main__":
         cursor.execute(f"ALTER SYSTEM BOOTSTRAP ZONE '{args.zone}' SERVER '{rootservice}'")
         bootstrap_end = datetime.datetime.now()
         _logger.info('bootstrap success: %s ms' % ((bootstrap_end - bootstrap_begin).total_seconds() * 1000))
+        create_tenant_begin = datetime.datetime.now()
         # checkout server status
         cursor.execute("select * from oceanbase.__all_server")
         server_status = cursor.fetchall()
@@ -168,6 +169,8 @@ if __name__ == "__main__":
                         resource_pool_name=args.tenant_resource_pool_name,
                         zone_name=args.zone,
                         tenant_name=args.tenant_name)
+        create_tenant_end = datetime.datetime.now()
+        _logger.info('create tenant success: %s ms' % ((create_tenant_end - create_tenant_begin).total_seconds() * 1000))
         _logger.info('create tenant done')
 
     except mysql.err.Error as e:
