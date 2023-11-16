@@ -1084,7 +1084,7 @@ int ObRootService::start_service()
       FLOG_WARN("fail to set rs status", KR(ret));
     } else if (OB_FAIL(schedule_refresh_server_timer_task(0))) {
       FLOG_WARN("failed to schedule refresh_server task", KR(ret));
-    } else if (OB_FAIL(schedule_restart_timer_task(1000000))) {
+    } else if (OB_FAIL(schedule_restart_timer_task(3000000))) {
       FLOG_WARN("failed to schedule restart task", KR(ret));
     } else if (OB_FAIL(schema_service_->get_ddl_epoch_mgr().remove_all_ddl_epoch())) {
       FLOG_WARN("fail to remove ddl epoch", KR(ret));
@@ -5444,6 +5444,7 @@ int ObRootService::stop_restart_timer_tasks(){
   } else {
     task_queue_.cancel_timer_task(restart_task_);
   }
+  LOG_INFO("stop restart timer tasks finish", K(ret));
   return ret;
 }
 
