@@ -995,52 +995,49 @@ int ObBootstrap::create_all_schema(ObDDLService &ddl_service,
     uint64_t thread_number = 0;
     for (int64_t i = 0; OB_SUCC(ret) && i < table_schemas.count(); ++i) {
       if (table_schemas.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
-        threads.emplace_back([&ddl_service,&table_schemas,begin,i,&thread_number] {
-          int ret = OB_SUCCESS;
-          set_thread_name("MyWorker",thread_number++);
-          int64_t retry_times = 1;
-          while (OB_SUCC(ret)) {
-            if (OB_FAIL(batch_create_schema(ddl_service, table_schemas, begin, i + 1))) {
-              LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
-              // bugfix:
-              if ((OB_SCHEMA_EAGAIN == ret
-                   || OB_ERR_WAIT_REMOTE_SCHEMA_REFRESH == ret)
-                  && retry_times <= MAX_RETRY_TIMES) {
-                retry_times++;
-                ret = OB_SUCCESS;
-                LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-              }
-            } else {
-              break;
-            }
-          }
-        });
-        begin = i + 1;
-        // int64_t retry_times = 1;
-        // while (OB_SUCC(ret)) {
-        //   if (OB_FAIL(batch_create_schema(ddl_service, table_schemas, begin, i + 1))) {
-        //     LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
-        //     // bugfix:
-        //     if ((OB_SCHEMA_EAGAIN == ret
-        //          || OB_ERR_WAIT_REMOTE_SCHEMA_REFRESH == ret)
-        //         && retry_times <= MAX_RETRY_TIMES) {
-        //       retry_times++;
-        //       ret = OB_SUCCESS;
-        //       LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
-        //       ob_usleep(1 * 1000 * 1000L); // 1s
+        // threads.emplace_back([&ddl_service,&table_schemas,begin,i,&thread_number] {
+        //   int ret = OB_SUCCESS;
+        //   set_thread_name("MyWorker",thread_number++);
+        //   int64_t retry_times = 1;
+        //   while (OB_SUCC(ret)) {
+        //     if (OB_FAIL(batch_create_schema(ddl_service, table_schemas, begin, i + 1))) {
+        //       LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
+        //       // bugfix:
+        //       if ((OB_SCHEMA_EAGAIN == ret
+        //            || OB_ERR_WAIT_REMOTE_SCHEMA_REFRESH == ret)
+        //           && retry_times <= MAX_RETRY_TIMES) {
+        //         retry_times++;
+        //         ret = OB_SUCCESS;
+        //         LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
+        //         std::this_thread::sleep_for(std::chrono::seconds(1));
+        //       }
+        //     } else {
+        //       break;
         //     }
-        //   } else {
-        //     break;
         //   }
-        // }
-        // if (OB_SUCC(ret)) {
-        //   begin = i + 1;
-        // }
+        // });
+        // begin = i + 1;
+        int64_t retry_times = 1;
+        while (OB_SUCC(ret)) {
+          if (OB_FAIL(batch_create_schema(ddl_service, table_schemas, begin, i + 1))) {
+            LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
+            // bugfix:
+            if ((OB_SCHEMA_EAGAIN == ret
+                 || OB_ERR_WAIT_REMOTE_SCHEMA_REFRESH == ret)
+                && retry_times <= MAX_RETRY_TIMES) {
+              retry_times++;
+              ret = OB_SUCCESS;
+              LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
+              ob_usleep(1 * 1000 * 1000L); // 1s
+            }
+          } else {
+            break;
+          }
+        }
+        if (OB_SUCC(ret)) {
+          begin = i + 1;
+        }
       }
-    }
-    for (auto &thread : threads) {
-      thread.join();
     }
   }
   LOG_INFO("end create all schemas", K(ret), "table count", table_schemas.count(),
