@@ -10,8 +10,10 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/container/ob_array_serialization.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
+#include "share/schema/ob_table_schema.h"
 #include "storage/tx/ob_dup_table_base.h"
 #include <cstdint>
 #include <thread>
@@ -565,6 +567,7 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
   int ret = OB_SUCCESS;
   bool already_bootstrap = true;
   ObSArray<ObTableSchema> table_schemas;
+  ObSArray<ObTableSchema> sorted_table_schemas;
   begin_ts_ = ObTimeUtility::current_time();
   int64_t begin_ts = ObTimeUtility::current_time();
   BOOTSTRAP_LOG(INFO, "start do execute_bootstrap");
@@ -590,7 +593,9 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
     LOG_WARN("broadcast_sys_schemas failed", K(table_schemas), K(ret));
   } else if (OB_FAIL(create_all_partitions())) {
     LOG_WARN("create all partitions fail", K(ret));
-  } else if (OB_FAIL(create_all_schema(ddl_service_, table_schemas))) {
+  } else if (OB_FAIL(sort_schema(table_schemas, sorted_table_schemas))) {
+    LOG_WARN("sort schema fail", K(ret));
+  } else if (OB_FAIL(create_all_schema(ddl_service_, sorted_table_schemas))) {
     LOG_WARN("create_all_schema failed",  K(table_schemas), K(ret));
   }
   BOOTSTRAP_CHECK_SUCCESS_V2("create_all_schema");
