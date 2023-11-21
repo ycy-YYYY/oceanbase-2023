@@ -26258,6 +26258,7 @@ int ObDDLService::alter_tablegroup(const ObAlterTablegroupArg &arg)
 int ObDDLService::refresh_schema(uint64_t tenant_id, int64_t *publish_schema_version /*NULL*/)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   int64_t refresh_count = 0;
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("variable is not init");
@@ -26330,6 +26331,8 @@ int ObDDLService::refresh_schema(uint64_t tenant_id, int64_t *publish_schema_ver
     }
     THIS_WORKER.set_timeout_ts(original_timeout_us);
   }
+  LOG_INFO("refresh schema finished", KR(ret), K(tenant_id), K(refresh_count),
+                                      "cost_time", ObTimeUtility::current_time() - begin_ts);
 
   return ret;
 }

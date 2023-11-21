@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
 #define USING_LOG_PREFIX SHARE
 #include "share/ob_all_server_tracer.h"
 #include "lib/thread/thread_mgr.h"
@@ -199,6 +200,7 @@ int ObServerTraceMap::find_server_info(const ObAddr &addr, ObServerInfoInTable &
       if (OB_FAIL(server_info.assign(server_info_i))) {
         LOG_WARN("fail to assign server_info", KR(ret), K(server_info_i));
       } else {
+        LOG_INFO("find server info", K(server_info_i), K(server_info));
         found = true;
       }
     }

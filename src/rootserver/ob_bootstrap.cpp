@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/charset/ob_mysql_global.h"
 #include "lib/container/ob_array_serialization.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
@@ -612,9 +613,10 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
 
   if (FAILEDx(add_servers_in_rs_list(server_zone_op_service))) {
     LOG_WARN("fail to add servers in rs_list_", KR(ret));
-  } else if (OB_FAIL(wait_all_rs_in_service())) {
-    LOG_WARN("failed to wait all rs in service", KR(ret));
-  } else {
+  }
+  // } else if (OB_FAIL(wait_all_rs_in_service())) {
+  //   LOG_WARN("failed to wait all rs in service", KR(ret));} 
+  else {
     ROOTSERVICE_EVENT_ADD("bootstrap", "bootstrap_succeed");
   }
 
@@ -1124,6 +1126,7 @@ int ObBootstrap::construct_schema(
 
 int ObBootstrap::add_servers_in_rs_list(rootserver::ObServerZoneOpService &server_zone_op_service) {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   ObArray<ObAddr> servers;
   if (OB_ISNULL(GCTX.root_service_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -1155,12 +1158,14 @@ int ObBootstrap::add_servers_in_rs_list(rootserver::ObServerZoneOpService &serve
       }
     }
   }
+  LOG_INFO("finish add servers in rs_list_", KR(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
 int ObBootstrap::wait_all_rs_in_service()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const int64_t check_interval = 500 * 1000;
   int64_t left_time_can_sleep = WAIT_RS_IN_SERVICE_TIMEOUT_US;
   if (OB_FAIL(check_inner_stat())) {
@@ -1208,6 +1213,7 @@ int ObBootstrap::wait_all_rs_in_service()
     }
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish wait all rs in service", KR(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -1470,6 +1476,7 @@ int ObBootstrap::insert_sys_ls_(const share::schema::ObTenantSchema &tenant_sche
 int ObBootstrap::init_system_data()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("check_inner_stat failed", KR(ret));
   } else if (OB_FAIL(unit_mgr_.load())) {
@@ -1484,6 +1491,7 @@ int ObBootstrap::init_system_data()
     LOG_WARN("failed to init all zone table", KR(ret));
   }
   BOOTSTRAP_CHECK_SUCCESS();
+  LOG_INFO("finish init system data", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
