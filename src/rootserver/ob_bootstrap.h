@@ -169,6 +169,12 @@ private:
       ObDDLService &ddl_service,
       common::ObIArray<share::schema::ObTableSchema> &table_schemas,
       const int64_t begin, const int64_t end);
+  static int parallel_batch_create_schema(ObDDLService &ddl_service, ObIArray<ObTableSchema> &table_schemas);
+  static int batch_create_schema_local(
+      const uint64_t tenant_id,
+      ObDDLService &ddl_service,
+      common::ObIArray<share::schema::ObTableSchema> &table_schemas,
+      const int64_t begin, const int64_t end);
   virtual int check_is_already_bootstrap(bool &is_bootstrap);
   virtual int init_global_stat();
   virtual int init_sequence_id();
