@@ -146,6 +146,8 @@ int ObUpdateRsListTask::process_without_lock()
                                     inner_need_update))) {
         LOG_WARN("failed to check need to update rs list", K(ret), K(new_rs_list), K(cluster_role));
       } else if (need_update) {
+        LOG_INFO("need update rs list", K(new_rs_list), K(new_readonly_rs_list),
+                 K(cluster_role), K(inner_need_update), K(rs_list_diff_member_list));
         if (OB_FAIL(root_addr_agent_->store(new_rs_list, new_readonly_rs_list, inner_need_update,
                                            cluster_role, timestamp))) {
           LOG_WARN("store rs_list failed", K(new_rs_list), K(new_readonly_rs_list), K(inner_need_update), K(ret));
