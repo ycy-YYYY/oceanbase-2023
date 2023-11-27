@@ -345,6 +345,7 @@ int ObLSStatusOperator::update_ls_status(
       }
     }
   }
+  LOG_INFO("update_ls_status", KR(ret), K(tenant_id), K(id), K(old_status), K(new_status));
   return ret;
 }
 

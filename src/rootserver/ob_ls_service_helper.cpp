@@ -677,6 +677,7 @@ int ObLSServiceHelper::revision_to_equal_status_(const ObLSStatusMachineParamete
     }
   } else if (ls_info.ls_is_creating()) {
     if (!status_info.is_valid()) {
+      LOG_INFO("status info is invalid, new ls is creating YCY", K(machine));
       //create ls
       START_TRANSACTION(GCTX.sql_proxy_, ObLSLifeIAgent::get_exec_tenant_id(tenant_id));
       if (FAILEDx(create_new_ls_in_trans(ls_info.get_ls_id(),
@@ -701,6 +702,8 @@ int ObLSServiceHelper::revision_to_equal_status_(const ObLSStatusMachineParamete
             ls_info.get_ls_status(), working_sw_status, *GCTX.sql_proxy_))) {
       LOG_WARN("failed to update ls status", KR(ret), K(status_info), K(tenant_id),
           K(ls_info), K(working_sw_status));
+    }else {
+      LOG_INFO("ls status from created to normal YCY", K(machine));
     }
   } else if (ls_info.ls_is_pre_tenant_dropping()) {
     if (!status_info.ls_is_normal() || !status_info.ls_id_.is_sys_ls()) {

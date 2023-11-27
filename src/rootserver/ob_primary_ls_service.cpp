@@ -525,6 +525,7 @@ int ObPrimaryLSService::create_ls_for_create_tenant()
     }
     END_TRANSACTION(trans)
   }
+  LOG_INFO("[LS_MGR] create ls for create tenant YCY", KR(ret), K(tenant_id_));
   return ret;
 }
 

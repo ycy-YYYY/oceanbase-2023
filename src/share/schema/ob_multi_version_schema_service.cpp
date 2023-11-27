@@ -2442,6 +2442,7 @@ int ObMultiVersionSchemaService::async_refresh_schema(
       }
     }
   }
+  
   return ret;
 }
 

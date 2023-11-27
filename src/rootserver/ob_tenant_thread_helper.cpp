@@ -9,7 +9,6 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PubL v2 for more details.
  */
-
 #define USING_LOG_PREFIX RS
 #include "ob_tenant_thread_helper.h"
 #include "lib/profile/ob_trace_id.h"
@@ -171,6 +170,7 @@ int ObTenantThreadHelper::wait_tenant_data_version_ready_(
     const uint64_t tenant_id, const uint64_t &data_version)
 {
   int ret = OB_SUCCESS;
+  int64_t start_ts = ObTimeUtility::current_time();
   bool is_ready = false;
   uint64_t tenant_data_version = 0;
   while (!is_ready && !has_set_stop()) {
@@ -195,6 +195,8 @@ int ObTenantThreadHelper::wait_tenant_data_version_ready_(
     LOG_WARN("thread has been stopped", K(is_ready), K(tenant_id));
     ret = OB_IN_STOP_STATE;
   }
+  LOG_INFO("wait tenant data version ready", KR(ret), K(tenant_id),
+      K(data_version), K(start_ts), "costYcy", ObTimeUtility::current_time() - start_ts);
   return ret;
 }
 
@@ -202,6 +204,7 @@ int ObTenantThreadHelper::wait_tenant_schema_and_version_ready_(
     const uint64_t tenant_id, const uint64_t &data_version)
 {
   int ret = OB_SUCCESS;
+  int64_t start_ts = ObTimeUtility::current_time();
   if (OB_ISNULL(GCTX.schema_service_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("schema ptr is null", KR(ret), KP(GCTX.schema_service_));
@@ -218,11 +221,12 @@ int ObTenantThreadHelper::wait_tenant_schema_and_version_ready_(
         ret = OB_NEED_WAIT;
         LOG_WARN("tenant schema not ready, no need tenant balance", KR(ret), K(tenant_schema));
       } else {
+        LOG_INFO("tenant schema ready YCY", K(tenant_schema));
         is_ready = true;
       }
 
       if (!is_ready) {
-        idle(10 * 1000 *1000);
+        idle(5 * 1000 *100);
       }
     }
 
@@ -231,6 +235,8 @@ int ObTenantThreadHelper::wait_tenant_schema_and_version_ready_(
       ret = OB_IN_STOP_STATE;
     }
   }
+  LOG_INFO("wait tenant schema and version ready", KR(ret), K(tenant_id),
+      K(data_version), K(start_ts), "costYcy", ObTimeUtility::current_time() - start_ts);
   return ret;
 }
 
