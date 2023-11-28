@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/allocator/ob_malloc.h"
 #define USING_LOG_PREFIX COMMON_MYSQLP
 
 #include "lib/mysqlclient/ob_isql_connection.h"
@@ -46,6 +47,9 @@ ObMySQLTransaction::~ObMySQLTransaction()
       ob_delete(it.second);
     }
     query_stash_desc_.destroy();
+  }
+  for (auto &it : query_stash_desc_) {
+    delete(it.second);
   }
 }
 

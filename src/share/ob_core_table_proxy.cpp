@@ -373,11 +373,14 @@ int ObCoreTableProxy::load()
 int ObCoreTableProxy::load_for_update()
 {
   int ret = OB_SUCCESS;
+  
   int64_t begin_ts = ObTimeUtility::current_time();
   const bool for_update = true;
   if (!is_valid()) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), KPC(this));
+  } else if (load_for_update_) {
+    //skip
   } else if (OB_FAIL(load(for_update))) {
     LOG_WARN("load failed", K(ret), K(for_update));
   }

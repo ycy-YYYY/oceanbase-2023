@@ -13,14 +13,23 @@
 #ifndef OCEANBASE_MYSQL_TRANSACTION_H_
 #define OCEANBASE_MYSQL_TRANSACTION_H_
 
+#include "lib/hash/ob_hashmap.h"
 #include "lib/string/ob_sql_string.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/mysqlclient/ob_isql_client.h"
 #include "lib/mysqlclient/ob_mysql_connection.h"
 #include "lib/mysqlclient/ob_single_connection_proxy.h"
+#include <unordered_map>
+#include <utility>
 
 namespace oceanbase
 {
+  
+namespace share
+{
+class ObCoreTableProxy;
+}
+  
 namespace common
 {
 namespace sqlclient
@@ -85,6 +94,23 @@ public:
   constexpr static int QUERY_MIN_BATCH_CNT = 200;
   // do stash query all
   int do_stash_query(int min_batch_cnt = 1);
+  int insert_core_table(const char* table_name, share::ObCoreTableProxy *core_table_proxy){
+    if(core_table_proxy_map_.find(table_name) != core_table_proxy_map_.end()){
+       return OB_ENTRY_EXIST;
+    }
+    core_table_proxy_map_.insert(std::make_pair(table_name, core_table_proxy));
+    return OB_SUCCESS;
+  }
+  int get_core_table(const char* table_name, share::ObCoreTableProxy *&core_table_proxy){
+    int ret = OB_SUCCESS;
+    core_table_proxy = NULL;
+    if(core_table_proxy_map_.find(table_name) != core_table_proxy_map_.end()){
+      core_table_proxy = core_table_proxy_map_.at(table_name);
+    } else{
+      core_table_proxy = nullptr;
+    }
+    return OB_SUCCESS;
+  }
 protected:
   int start_transaction(const uint64_t &tenant_id, bool with_snap_shot);
   int end_transaction(const bool commit);
@@ -93,6 +119,7 @@ protected:
   bool in_trans_;
   // inner sql now not support multi query，enable_query_stash now just enable for batch insert values
   bool enable_query_stash_;
+  std::unordered_map<const char*, share::ObCoreTableProxy*> core_table_proxy_map_;
   hash::ObHashMap<const char*, ObSqlTransQueryStashDesc*> query_stash_desc_;
 };
 

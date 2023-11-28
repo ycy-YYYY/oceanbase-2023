@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "share/ob_core_table_proxy.h"
 #include <cstdint>
 #define USING_LOG_PREFIX SHARE_SCHEMA
 #include "ob_table_sql_service.h"
@@ -86,12 +87,18 @@ int ObTableSqlService::exec_insert(
   int ret = OB_SUCCESS;
   if (is_core_table(table_id)) {
     ObArray<ObCoreTableProxy::UpdateCell> cells;
-    ObCoreTableProxy kv(table_name, sql_client, tenant_id);
-    if (OB_FAIL(kv.load_for_update())) {
+    ObMySQLTransaction &mysql_trans = static_cast<ObMySQLTransaction &>(sql_client);
+    ObCoreTableProxy *kv = nullptr;
+    mysql_trans.get_core_table(table_name, kv);
+    if (kv == nullptr){
+      kv = new ObCoreTableProxy(table_name,sql_client,tenant_id);
+      mysql_trans.insert_core_table(table_name, kv);
+    }
+    if (OB_FAIL(kv->load_for_update())) {
       LOG_WARN("failed to load kv for insert", K(ret));
-    } else if (OB_FAIL(dml.splice_core_cells(kv, cells))) {
+    } else if (OB_FAIL(dml.splice_core_cells(*kv, cells))) {
       LOG_WARN("splice core cells failed", K(ret));
-    } else if (OB_FAIL(kv.replace_row(cells, affected_rows))) {
+    } else if (OB_FAIL(kv->replace_row(cells, affected_rows))) {
       LOG_WARN("failed to replace row", K(ret));
     }
   } else {
@@ -1095,11 +1102,18 @@ int ObTableSqlService::add_columns_for_core(ObISQLClient &sql_client, const ObTa
   const int64_t tenant_id = table.get_tenant_id();
 
   ObDMLSqlSplicer dml;
-  ObCoreTableProxy kv(OB_ALL_COLUMN_TNAME, sql_client, tenant_id);
+  ObMySQLTransaction &mysql_trans = static_cast<ObMySQLTransaction &>(sql_client);
+  ObCoreTableProxy *kv = nullptr;
+  mysql_trans.get_core_table(OB_ALL_COLUMN_TNAME, kv);
+  if (kv == nullptr){
+    kv = new ObCoreTableProxy(OB_ALL_COLUMN_TNAME, sql_client,tenant_id);
+    mysql_trans.insert_core_table(OB_ALL_COLUMN_TNAME, kv);
+  }
+  
   ObArray<ObCoreTableProxy::UpdateCell> cells;
   if (OB_FAIL(check_ddl_allowed(table))) {
     LOG_WARN("check ddl allowd failed", K(ret), K(table));
-  } else if (OB_FAIL(kv.load_for_update())) {
+  } else if (OB_FAIL(kv->load_for_update())) {
     LOG_WARN("failed to load kv for update", K(ret));
   }
   // for batch sql query
@@ -1123,9 +1137,9 @@ int ObTableSqlService::add_columns_for_core(ObISQLClient &sql_client, const ObTa
     int64_t affected_rows = 0;
     if (OB_FAIL(gen_column_dml(tenant_id, column, dml))) {
       LOG_WARN("gen column dml failed", K(ret));
-    } else if (OB_FAIL(dml.splice_core_cells(kv, cells))) {
+    } else if (OB_FAIL(dml.splice_core_cells(*kv, cells))) {
       LOG_WARN("splice core cells failed", K(ret));
-    } else if (OB_FAIL(kv.replace_row(cells, affected_rows))) {
+    } else if (OB_FAIL(kv->replace_row(cells, affected_rows))) {
       LOG_WARN("failed to replace row", K(ret));
     }
     if (OB_FAIL(ret)) {
