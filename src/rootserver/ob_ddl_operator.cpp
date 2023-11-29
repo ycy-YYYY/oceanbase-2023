@@ -10,6 +10,10 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/container/ob_iarray.h"
+#include "lib/utility/ob_macro_utils.h"
+#include "share/schema/ob_schema_struct.h"
+#include <cstddef>
 #define USING_LOG_PREFIX RS
 #include "rootserver/ob_ddl_operator.h"
 
@@ -1545,6 +1549,47 @@ int ObDDLOperator::create_table(ObTableSchema &table_schema,
         }
       }
     }
+  }
+  return ret;
+}
+
+int ObDDLOperator::batch_create_core_tables(ObIArray<ObTableSchema> &table_schemas,
+                                            ObMySQLTransaction &trans,
+                                            const ObString *ddl_stmt_str/*=NULL*/)
+{
+  int ret = OB_SUCCESS;
+  const uint64_t tenant_id = table_schemas.at(0).get_tenant_id();
+  int64_t new_schema_version = OB_INVALID_VERSION;
+  ObSchemaService *schema_service = schema_service_.get_schema_service();
+  ObSchemaGetterGuard schema_guard;
+  if (OB_ISNULL(schema_service)) {
+    ret = OB_ERR_SYS;
+    RS_LOG(ERROR, "schema_service must not null");
+  } else if (OB_FAIL(schema_service_.get_tenant_schema_guard(tenant_id, schema_guard))) {
+    LOG_WARN("failed to get schema guard", K(ret));
+  } else if (OB_FAIL(schema_service_.gen_new_schema_version(tenant_id, new_schema_version))) {
+    LOG_WARN("fail to gen new schema_version", K(ret), K(tenant_id));
+  } else {
+    for (int i = 0; i < table_schemas.count() - 1; ++i){
+      ObTableSchema &table_schema = table_schemas.at(i);
+      table_schema.set_schema_version(new_schema_version);
+      if (OB_FAIL(schema_service->get_table_sql_service().create_table_without_log(
+        table_schema,
+        trans,
+        ddl_stmt_str,
+        false,
+        false))) {
+        RS_LOG(WARN, "failed to create table", K(ret));
+      }
+    }
+    ObTableSchema &table_schema = table_schemas.at(table_schemas.count() - 1);
+    table_schema.set_schema_version(new_schema_version);
+    
+    if (OB_FAIL(create_table(table_schema, trans,nullptr,true,false))){
+      RS_LOG(WARN, "failed to create table", K(ret));
+    }
+    
+    // set core schema version
   }
   return ret;
 }

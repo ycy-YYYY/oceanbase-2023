@@ -44,25 +44,26 @@ int batch_create_schema_local(uint64_t tenant_id,
     if (OB_FAIL(trans.start(&ddl_service.get_sql_proxy(), tenant_id))) {
       LOG_WARN("start transaction failed", KR(ret));
     } else {
-      for (int64_t idx = begin;idx < end && OB_SUCC(ret); idx++) {
-        ObTableSchema &table = table_schemas.at(idx);
-        const ObString *ddl_stmt = NULL;
-        bool need_sync_schema_version = !(ObSysTableChecker::is_sys_table_index_tid(table.get_table_id()) ||
-                                          is_sys_lob_table(table.get_table_id()));
-        int64_t start_time = ObTimeUtility::current_time();
-        if (OB_FAIL(ddl_operator.create_table(table, trans, ddl_stmt,
-                                              need_sync_schema_version,
-                                              false))) {
-          LOG_WARN("add table schema failed", K(ret),
-              "table_id", table.get_table_id(),
-              "table_name", table.get_table_name());
-        } else {
-          int64_t end_time = ObTimeUtility::current_time();
-          LOG_INFO("add table schema succeed", K(idx),
-              "table_id", table.get_table_id(),
-              "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
-        }
-      }
+      ddl_operator.batch_create_core_tables(table_schemas, trans, nullptr);
+      // for (int64_t idx = begin;idx < end && OB_SUCC(ret); idx++) {
+      //   ObTableSchema &table = table_schemas.at(idx);
+      //   const ObString *ddl_stmt = NULL;
+      //   bool need_sync_schema_version = !(ObSysTableChecker::is_sys_table_index_tid(table.get_table_id()) ||
+      //                                     is_sys_lob_table(table.get_table_id()));
+      //   int64_t start_time = ObTimeUtility::current_time();
+      //   if (OB_FAIL(ddl_operator.create_table(table, trans, ddl_stmt,
+      //                                         need_sync_schema_version,
+      //                                         false))) {
+      //     LOG_WARN("add table schema failed", K(ret),
+      //         "table_id", table.get_table_id(),
+      //         "table_name", table.get_table_name());
+      //   } else {
+      //     int64_t end_time = ObTimeUtility::current_time();
+      //     LOG_INFO("add table schema succeed", K(idx),
+      //         "table_id", table.get_table_id(),
+      //         "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
+      //   }
+      // }
     }
     if (trans.is_started()) {
       const bool is_commit = (OB_SUCCESS == ret);

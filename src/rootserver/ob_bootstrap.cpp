@@ -12,10 +12,12 @@
 
 #include "lib/charset/ob_mysql_global.h"
 #include "lib/container/ob_array_serialization.h"
+#include "lib/container/ob_se_array.h"
 #include "lib/ob_define.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
 #include "lib/utility/ob_macro_utils.h"
+#include "share/inner_table/ob_inner_table_schema.h"
 #include "share/schema/ob_table_schema.h"
 #include "storage/tx/ob_dup_table_base.h"
 #include <cstdint>
@@ -861,6 +863,7 @@ int ObBootstrap::construct_all_schema(ObIArray<ObTableSchema> &table_schemas)
   int ret = OB_SUCCESS;
   int64_t begin_ts = ObTimeUtility::current_time();
   const schema_create_func *creator_ptr_arrays[] = {
+    all_core_table_schema_creator,
     core_table_schema_creators,
     sys_table_schema_creators,
     virtual_table_schema_creators,
@@ -978,16 +981,17 @@ int ObBootstrap::create_all_schema(ObDDLService &ddl_service,
     LOG_WARN("table_schemas is empty", K(table_schemas), K(ret));
   } else {
     // persist __all_core_table's schema in inner table, which is only used for sys views.
-    HEAP_VAR(ObTableSchema, core_table) {
-       ObArray<ObTableSchema> tmp_tables;
-      if (OB_FAIL(ObInnerTableSchema::all_core_table_schema(core_table))) {
-        LOG_WARN("fail to construct __all_core_table's schema", KR(ret), K(core_table));
-      } else if (OB_FAIL(tmp_tables.push_back(core_table))) {
-        LOG_WARN("fail to push back __all_core_table's schema", KR(ret), K(core_table));
-      } else if (OB_FAIL(batch_create_schema(ddl_service, tmp_tables, 0, 1))) {
-        LOG_WARN("fail to create __all_core_table's schema", KR(ret), K(core_table));
-      }
-    }
+    // HEAP_VAR(ObTableSchema, core_table) {
+    //    ObArray<ObTableSchema> tmp_tables;
+    //   if (OB_FAIL(ObInnerTableSchema::all_core_table_schema(core_table))) {
+    //     LOG_WARN("fail to construct __all_core_table's schema", KR(ret), K(core_table));
+    //   } else if (OB_FAIL(tmp_tables.push_back(core_table))) {
+    //     LOG_WARN("fail to push back __all_core_table's schema", KR(ret), K(core_table));
+    //   } else if (OB_FAIL(batch_create_schema(ddl_service, tmp_tables, 0, 1))) {
+    //     LOG_WARN("fail to create __all_core_table's schema", KR(ret), K(core_table));
+    //   }
+    // }
+    
     if(OB_SUCC(ret)){
       if (OB_FAIL(parallel_batch_create_schema(ddl_service, table_schemas))){
         LOG_WARN("fail to create all schema", KR(ret));
@@ -1021,26 +1025,10 @@ int ObBootstrap::batch_create_schema(ObDDLService &ddl_service,
                             refreshed_schema_version))) {
       LOG_WARN("start transaction failed", KR(ret));
     } else {
-      bool is_truncate_table = false;
-      for (int64_t i = begin; OB_SUCC(ret) && i < end; ++i) {
-        ObTableSchema &table = table_schemas.at(i);
-        const ObString *ddl_stmt = NULL;
-        bool need_sync_schema_version = !(ObSysTableChecker::is_sys_table_index_tid(table.get_table_id()) ||
-                                          is_sys_lob_table(table.get_table_id()));
-        int64_t start_time = ObTimeUtility::current_time();
-        if (OB_FAIL(ddl_operator.create_table(table, trans, ddl_stmt,
-                                              need_sync_schema_version,
-                                              is_truncate_table))) {
-          LOG_WARN("add table schema failed", K(ret),
-              "table_id", table.get_table_id(),
-              "table_name", table.get_table_name());
-        } else {
-          int64_t end_time = ObTimeUtility::current_time();
-          LOG_INFO("add table schema succeed", K(i),
-              "table_id", table.get_table_id(),
-              "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
-        }
+      if(OB_FAIL(ddl_operator.batch_create_core_tables(table_schemas, trans, nullptr))){
+        LOG_WARN("create_core_tables_failed");
       }
+      
     }
   }
 
@@ -1694,27 +1682,55 @@ int ObBootstrap::set_in_bootstrap()
 int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArray<ObTableSchema> &table_schemas){
   int ret = OB_SUCCESS;
   int64_t begin = 0;
-  int64_t batch_count = table_schemas.count() / 16;
   const int64_t MAX_RETRY_TIMES = 10;
   int64_t finish_cnt = 0;
   std::vector<std::thread> ths;
   ObCurTraceId::TraceId *cur_trace_id = ObCurTraceId::get_trace_id();
+  
+  ObSArray<ObTableSchema> core_tables;
+  ObSArray<ObTableSchema> other_tables;
+    
   for (int64_t i = 0; OB_SUCC(ret) && i < table_schemas.count(); ++i) {
-    if (table_schemas.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
+      if (is_core_table(table_schemas.at(i).get_table_id())) {
+        if (OB_FAIL(core_tables.push_back(table_schemas.at(i)))) {
+          LOG_WARN("fail to push back core table", KR(ret), K(table_schemas.at(i)));
+        }
+      } else {
+        if (OB_FAIL(other_tables.push_back(table_schemas.at(i)))) {
+          LOG_WARN("fail to push back other table", KR(ret), K(table_schemas.at(i)));
+        }
+      }
+  }
+  
+  ths.emplace_back([&](){
+    int ret = OB_SUCCESS;
+    ObCurTraceId::set(*cur_trace_id);
+    set_thread_name("create_core", 0);
+    int64_t retry_times = 1;
+    if (OB_FAIL(batch_create_schema(ddl_service, core_tables, 0, core_tables.count()))){
+      LOG_WARN("create_core_tables failed");
+    }else{
+      ATOMIC_AAF(&finish_cnt, core_tables.count());
+    }
+  });
+  
+  int64_t batch_count = other_tables.count() / 32;
+  for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {
+    if (other_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
       std::thread th([&, begin, i, cur_trace_id] () {
         int ret = OB_SUCCESS;
         ObCurTraceId::set(*cur_trace_id);
         set_thread_name("batch_create_schema_local", i - begin);
         int64_t retry_times = 1;
         while (OB_SUCC(ret)) {
-          if (OB_FAIL(batch_create_schema_local(OB_SYS_TENANT_ID, ddl_service, table_schemas, begin, i + 1))) {
+          if (OB_FAIL(batch_create_schema_local(OB_SYS_TENANT_ID, ddl_service, other_tables, begin, i + 1))) {
             LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
             // bugfix:
             if (retry_times <= MAX_RETRY_TIMES) {
               retry_times++;
               ret = OB_SUCCESS;
               LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
-              usleep(1 * 1000 * 1000L); // 1s
+              usleep(1 * 100 * 1000L); // 0.1s
             }
           } else {
             ATOMIC_AAF(&finish_cnt, i + 1 - begin);
@@ -1769,7 +1785,12 @@ int ObBootstrap::batch_create_schema_local(uint64_t tenant_id,
               "table_name", table.get_table_name());
         } else {
           int64_t end_time = ObTimeUtility::current_time();
-          LOG_INFO("add table schema succeed", K(idx),
+          if (is_core_table(table.get_table_id())) {
+            LOG_INFO("add core table schema succeed", K(idx),
+                "table_id", table.get_table_id(),
+                "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
+          } 
+            LOG_INFO("add table schema succeed", K(idx),
               "table_id", table.get_table_id(),
               "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
         }

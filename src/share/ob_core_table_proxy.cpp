@@ -10,6 +10,8 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
+#include <cstdint>
 #define USING_LOG_PREFIX SHARE
 
 #include "share/ob_core_table_proxy.h"
@@ -373,8 +375,6 @@ int ObCoreTableProxy::load()
 int ObCoreTableProxy::load_for_update()
 {
   int ret = OB_SUCCESS;
-  
-  int64_t begin_ts = ObTimeUtility::current_time();
   const bool for_update = true;
   if (!is_valid()) {
     ret = OB_INVALID_ARGUMENT;
@@ -384,8 +384,6 @@ int ObCoreTableProxy::load_for_update()
   } else if (OB_FAIL(load(for_update))) {
     LOG_WARN("load failed", K(ret), K(for_update));
   }
-  int64_t end_ts = ObTimeUtility::current_time();
-  LOG_INFO("load for update", K(ret), "costYcy", end_ts - begin_ts);
   return ret;
 }
 
@@ -1149,7 +1147,6 @@ int ObCoreTableProxy::execute_update_sql(const Row &row, const ObIArray<UpdateCe
 
     int64_t affected = 0;
     ObSqlString sql;
-
     //batch insert
     //can use insert ... on duplicate update
     //the empty of __all_core_table and __all_root_table take into count,

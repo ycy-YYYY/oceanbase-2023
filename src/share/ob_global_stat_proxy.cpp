@@ -10,6 +10,8 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
+#include <cstdint>
 #define USING_LOG_PREFIX SHARE
 
 #include "share/ob_global_stat_proxy.h"
@@ -330,6 +332,7 @@ int ObGlobalStatProxy::update(const ObGlobalStatItem::ItemList &list,
                               const bool is_incremental)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_time = ObTimeUtility::current_time();
   int64_t affected_rows = 0;
   ObDMLSqlSplicer dml(ObDMLSqlSplicer::NAKED_VALUE_MODE);
   ObArray<ObCoreTableProxy::UpdateCell> cells;
@@ -343,6 +346,8 @@ int ObGlobalStatProxy::update(const ObGlobalStatItem::ItemList &list,
   } else if (OB_FAIL(core_table_.load_for_update())) {
     LOG_WARN("core_table_load_for_update failed", K(ret));
   } else {
+    LOG_INFO("load update global stat",
+        "cost", ObTimeUtility::current_time() - begin_time);
     const ObGlobalStatItem *it = list.get_first();
     if (NULL == it) {
       ret = OB_ERR_UNEXPECTED;
@@ -374,6 +379,10 @@ int ObGlobalStatProxy::update(const ObGlobalStatItem::ItemList &list,
   } else if (is_incremental && affected_rows >= 2) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("affected row should less than 2", K(ret), K(affected_rows));
+  }
+  if (OB_SUCC(ret)) {
+    LOG_INFO("update global stat", K(list), K(is_incremental), K(affected_rows),
+        "cost", ObTimeUtility::current_time() - begin_time);
   }
   return ret;
 }

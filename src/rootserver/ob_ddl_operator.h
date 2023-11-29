@@ -144,6 +144,10 @@ public:
                             const share::schema::ObSchemaOperationType op,
                             common::ObMySQLTransaction &trans,
                             const common::ObString *ddl_stmt_str = NULL);
+                            
+  int batch_create_core_tables(ObIArray<ObTableSchema> &table_schemas,
+                                            ObMySQLTransaction &trans,
+                                            const ObString *ddl_stmt_str/*=NULL*/);
 
   virtual int drop_tenant(const uint64_t tenant_id, common::ObMySQLTransaction &trans,
                           const common::ObString *ddl_stmt_str = NULL);

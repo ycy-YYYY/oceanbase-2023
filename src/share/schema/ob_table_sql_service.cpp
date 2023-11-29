@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/ob_define.h"
 #include "share/ob_core_table_proxy.h"
 #include <cstdint>
 #define USING_LOG_PREFIX SHARE_SCHEMA
@@ -2416,6 +2417,9 @@ int ObTableSqlService::create_table(ObTableSchema &table,
     cost_usec = end_usec - start_usec;
     start_usec = end_usec;
     LOG_INFO("add_table cost: ", K(cost_usec));
+    if(is_core_table(table.get_table_id())) {
+      LOG_INFO("add_core_table cost: ", K(cost_usec));
+    }
     if (OB_FAIL(add_columns(sql_client, table))) {
       LOG_WARN("insert column schema failed, ", K(ret), "table", to_cstring(table));
     } else if (OB_FAIL(add_constraints(sql_client, table))) {
@@ -2425,6 +2429,9 @@ int ObTableSqlService::create_table(ObTableSchema &table,
     cost_usec = end_usec - start_usec;
     start_usec = end_usec;
     LOG_INFO("add_column cost: ", K(cost_usec));
+    if(is_core_table(table.get_table_id())) {
+      LOG_INFO("add_core_table cost: column", K(cost_usec));
+    }
     if (OB_SUCC(ret)) {
       if (OB_FAIL(add_table_part_info(sql_client, table))) {
         LOG_WARN("fail to add_table_part_info", K(ret));
@@ -2433,6 +2440,9 @@ int ObTableSqlService::create_table(ObTableSchema &table,
       cost_usec = end_usec - start_usec;
       start_usec = end_usec;
       LOG_INFO("add part info cost: ", K(cost_usec));
+      if(is_core_table(table.get_table_id())) {
+        LOG_INFO("add_core_table cost: part info", K(cost_usec));
+      }
     }
     // insert into all_foreign_key.
     if (OB_SUCC(ret) && !is_inner_table(table.get_table_id())) {
@@ -2472,6 +2482,9 @@ int ObTableSqlService::create_table(ObTableSchema &table,
       cost_usec = end_usec - start_usec;
       start_usec = end_usec;
       LOG_INFO("log_operation cost: ", K(cost_usec));
+      if(is_core_table(table.get_table_id())) {
+        LOG_INFO("add_core_table cost: log_operation", K(cost_usec));
+      }
     }
 
     if (OB_SUCC(ret)) {
@@ -2485,11 +2498,110 @@ int ObTableSqlService::create_table(ObTableSchema &table,
         cost_usec = end_usec - start_usec;
         start_usec = end_usec;
         LOG_INFO("update_data_table_schema_version cost: ", K(cost_usec));
+        if(is_core_table(table.get_table_id())) {
+          LOG_INFO("add_core_table cost: update_data_table_schema_version", K(cost_usec));
+        }
       }
     }
   }
   return ret;
 }
+
+int ObTableSqlService::create_table_without_log(ObTableSchema &table, 
+                                                ObISQLClient &sql_client,
+                                                const ObString *ddl_stmt_str/*=NULL*/,
+                                                const bool need_sync_schema_version,
+                                                const bool is_truncate_table /*false*/)
+{
+  int ret = OB_SUCCESS;
+  int64_t start_usec = ObTimeUtility::current_time();
+  int64_t end_usec = 0;
+  int64_t cost_usec = 0;
+  const uint64_t tenant_id = table.get_tenant_id();
+
+  if (!table.is_valid()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid create table argument, ", K(table));
+  } else if (OB_FAIL(check_ddl_allowed(table))) {
+    LOG_WARN("check ddl allowd failed", K(ret), K(table));
+  }
+  if (OB_SUCCESS == ret && 0 != table.get_autoinc_column_id()) {
+    if (OB_FAIL(add_sequence(tenant_id, table.get_table_id(),
+                             table.get_autoinc_column_id(), table.get_auto_increment(),
+                             table.get_truncate_version()))) {
+      LOG_WARN("insert sequence record faild", K(ret), K(table));
+    }
+    end_usec = ObTimeUtility::current_time();
+    cost_usec = end_usec - start_usec;
+    start_usec = end_usec;
+    LOG_INFO("add_sequence for autoinc cost: ", K(cost_usec));
+  }
+
+  bool only_history = false;
+  uint64_t data_version = 0;
+  const bool update_object_status_ignore_version = false;
+  if (OB_FAIL(ret)) {
+  } else if (OB_FAIL(GET_MIN_DATA_VERSION(tenant_id, data_version))) {
+    LOG_WARN("failed to get data version", K(ret));
+  } else if (table.is_view_table() && data_version >= DATA_VERSION_4_1_0_0
+             && !table.is_sys_view()
+             && !table.is_force_view() && table.get_column_count() <= 0) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("get wrong view schema", K(ret), K(table));
+  } else if (data_version >= DATA_VERSION_4_1_0_0
+             && table.is_force_view()
+             && table.get_column_count() <= 0
+             && FALSE_IT(table.set_object_status(ObObjectStatus::INVALID))) {
+  } else if (table.is_view_table() && data_version >= DATA_VERSION_4_1_0_0
+             && table.get_column_count() > 0
+             && FALSE_IT(table.set_view_column_filled_flag(ObViewColumnFilledFlag::FILLED))) {
+  } else if (OB_FAIL(add_table(sql_client, table, update_object_status_ignore_version, only_history))) {
+    LOG_WARN("insert table schema failed, ", K(ret), "table", to_cstring(table));
+  } else if (!table.is_view_table()) {
+    end_usec = ObTimeUtility::current_time();
+    cost_usec = end_usec - start_usec;
+    start_usec = end_usec;
+    LOG_INFO("add_table cost: ", K(cost_usec));
+    if(is_core_table(table.get_table_id())) {
+      LOG_INFO("add_core_table cost: ", K(cost_usec));
+    }
+    if (OB_FAIL(add_columns(sql_client, table))) {
+      LOG_WARN("insert column schema failed, ", K(ret), "table", to_cstring(table));
+    } else if (OB_FAIL(add_constraints(sql_client, table))) {
+      LOG_WARN("insert constraint schema failed, ", K(ret), "table", to_cstring(table));
+    }
+    end_usec = ObTimeUtility::current_time();
+    cost_usec = end_usec - start_usec;
+    start_usec = end_usec;
+    LOG_INFO("add_column cost: ", K(cost_usec));
+    if(is_core_table(table.get_table_id())) {
+      LOG_INFO("add_core_table cost: column", K(cost_usec));
+    }
+    if (OB_SUCC(ret)) {
+      if (OB_FAIL(add_table_part_info(sql_client, table))) {
+        LOG_WARN("fail to add_table_part_info", K(ret));
+      }
+      end_usec = ObTimeUtility::current_time();
+      cost_usec = end_usec - start_usec;
+      start_usec = end_usec;
+      LOG_INFO("add part info cost: ", K(cost_usec));
+      if(is_core_table(table.get_table_id())) {
+        LOG_INFO("add_core_table cost: part info", K(cost_usec));
+      }
+    }
+    // insert into all_foreign_key.
+    if (OB_SUCC(ret) && !is_inner_table(table.get_table_id())) {
+      if (OB_FAIL(add_foreign_key(sql_client, table, false/* only_history */))) {
+        LOG_WARN("failed to add foreign key", K(ret));
+      }
+    }
+  } else if (table.view_column_filled() //view table
+             && OB_FAIL(add_columns(sql_client, table))) {
+    LOG_WARN("insert column schema failed, ", K(ret), "table", to_cstring(table));
+  }
+  return ret;
+}
+
 
 int ObTableSqlService::update_index_status(
     const ObTableSchema &data_table_schema,
