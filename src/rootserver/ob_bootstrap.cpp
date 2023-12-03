@@ -1689,13 +1689,18 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
   
   ObSArray<ObTableSchema> core_tables;
   ObSArray<ObTableSchema> other_tables;
+  ObSArray<ObTableSchema> data_tables;
     
   for (int64_t i = 0; OB_SUCC(ret) && i < table_schemas.count(); ++i) {
       if (is_core_table(table_schemas.at(i).get_table_id())) {
         if (OB_FAIL(core_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back core table", KR(ret), K(table_schemas.at(i)));
         }
-      } else {
+      } else if (table_schemas.at(i).is_table()) {
+        if (OB_FAIL(data_tables.push_back(table_schemas.at(i)))) {
+          LOG_WARN("fail to push back data table", KR(ret), K(table_schemas.at(i)));
+        }
+      }  else {
         if (OB_FAIL(other_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back other table", KR(ret), K(table_schemas.at(i)));
         }
@@ -1714,7 +1719,43 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
     }
   });
   
-  int64_t batch_count = other_tables.count() / 32;
+  int64_t batch_count = data_tables.count() / 24;
+  for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
+    if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
+      std::thread th([&, begin, i, cur_trace_id] () {
+        int ret = OB_SUCCESS;
+        ObCurTraceId::set(*cur_trace_id);
+        set_thread_name("batch_create_schema_local", i - begin);
+        int64_t retry_times = 1;
+        while (OB_SUCC(ret)) {
+          if (OB_FAIL(batch_create_schema_local(OB_SYS_TENANT_ID, ddl_service, data_tables, begin, i + 1))) {
+            LOG_WARN("batch create schema failed", K(ret), "table count", i + 1 - begin);
+            // bugfix:
+            if (retry_times <= MAX_RETRY_TIMES) {
+              retry_times++;
+              ret = OB_SUCCESS;
+              LOG_INFO("schema error while create table, need retry", KR(ret), K(retry_times));
+              usleep(1 * 100 * 1000L); // 0.1s
+            }
+          } else {
+            ATOMIC_AAF(&finish_cnt, i + 1 - begin);
+            break;
+          }
+        }
+        LOG_INFO("worker job", K(begin), K(i), K(i-begin), K(ret));
+      });
+      ths.emplace_back(std::move(th));
+      if (OB_SUCC(ret)) {
+        begin = i + 1;
+      }
+    }
+  }
+  for (auto &th : ths) {
+    th.join();
+  }
+  ths.clear();
+  batch_count = other_tables.count() / 24;
+  begin = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {
     if (other_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
       std::thread th([&, begin, i, cur_trace_id] () {
@@ -1745,9 +1786,7 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
       }
     }
   }
-  for (auto &th : ths) {
-    th.join();
-  }
+  
   if (finish_cnt != table_schemas.count()) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("parallel_create_table_schema fail", K(finish_cnt), K(table_schemas.count()), K(ret), K(OB_SYS_TENANT_ID));
