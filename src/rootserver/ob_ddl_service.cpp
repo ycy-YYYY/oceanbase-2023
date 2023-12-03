@@ -23409,7 +23409,7 @@ int ObDDLService::batch_create_sys_table_schema(
       LOG_INFO("end transaction failed", KR(ret), K(tenant_id));
     }
   }
-  LOG_INFO("batch_create_sys_table_schema", K(ret),K(end_idx-start_idx),"costYcy", ObTimeUtility::current_time() - begin_ts);
+  // LOG_INFO("batch_create_sys_table_schema", K(ret),K(end_idx-start_idx),"costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
