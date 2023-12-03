@@ -1785,12 +1785,7 @@ int ObBootstrap::batch_create_schema_local(uint64_t tenant_id,
               "table_name", table.get_table_name());
         } else {
           int64_t end_time = ObTimeUtility::current_time();
-          if (is_core_table(table.get_table_id())) {
-            LOG_INFO("add core table schema succeed", K(idx),
-                "table_id", table.get_table_id(),
-                "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
-          } 
-            LOG_INFO("add table schema succeed", K(idx),
+          LOG_INFO("add table schema succeed", K(idx),
               "table_id", table.get_table_id(),
               "table_name", table.get_table_name(), "core_table", is_core_table(table.get_table_id()), "cost", end_time-start_time);
         }

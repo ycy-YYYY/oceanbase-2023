@@ -23404,9 +23404,15 @@ int ObDDLService::batch_create_sys_table_schema(
       break;
     }
   }
-  if (OB_SUCC(ret)){
-    if (OB_FAIL(trans.end(true))){
-      LOG_INFO("end transaction failed", KR(ret), K(tenant_id));
+  
+  if (trans.is_started()) {
+    const bool is_commit = (OB_SUCCESS == ret);
+    int tmp_ret = trans.end(is_commit);
+    if (OB_SUCCESS != tmp_ret) {
+        LOG_WARN("end trans failed", K(tmp_ret), K(is_commit));
+        ret = (OB_SUCCESS == ret) ? tmp_ret : ret;
+    } else {
+      
     }
   }
   // LOG_INFO("batch_create_sys_table_schema", K(ret),K(end_idx-start_idx),"costYcy", ObTimeUtility::current_time() - begin_ts);
