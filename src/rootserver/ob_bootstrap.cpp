@@ -1718,7 +1718,8 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
       ATOMIC_AAF(&finish_cnt, core_tables.count());
     }
   });
-  tmp.detach();
+  ths.emplace_back(std::move(tmp));
+
   
   int64_t batch_count = data_tables.count() / 16;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
