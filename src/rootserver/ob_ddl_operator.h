@@ -144,6 +144,7 @@ public:
                             const share::schema::ObSchemaOperationType op,
                             common::ObMySQLTransaction &trans,
                             const common::ObString *ddl_stmt_str = NULL);
+  
                             
   int batch_create_core_tables(ObIArray<ObTableSchema> &table_schemas,
                                             ObMySQLTransaction &trans,

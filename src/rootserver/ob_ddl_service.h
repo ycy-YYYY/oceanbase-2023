@@ -130,6 +130,16 @@ public:
   {
      return non_partitioned_tablet_allocator_;
   }
+  
+  int batch_create_sys_table_schema(
+    ObDDLOperator &ddl_operator,
+    common::ObIArray<ObTableSchema> &tables,
+    uint64_t  tenant_id,
+    int start_idx,
+    int end_idx
+    );
+    
+  int parallel_create_sys_table_schemas(ObDDLOperator &ddl_operator,  common::ObIArray<ObTableSchema> &table_schemas,uint64_t tenant_id);
 
   // create_index_table will fill table_id and frozen_version to table_schema
   virtual int create_index_table(const obrpc::ObCreateIndexArg &arg,

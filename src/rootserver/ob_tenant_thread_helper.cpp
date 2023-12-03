@@ -226,7 +226,7 @@ int ObTenantThreadHelper::wait_tenant_schema_and_version_ready_(
       }
 
       if (!is_ready) {
-        idle(5 * 1000 *100);
+        idle(2 * 1000 *100);
       }
     }
 
