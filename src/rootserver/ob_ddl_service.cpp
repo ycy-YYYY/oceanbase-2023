@@ -21635,6 +21635,7 @@ int ObDDLService::create_sys_tenant(
     share::schema::ObTenantSchema &tenant_schema)
 {
   int ret = OB_SUCCESS;
+  int64_t start_time = ObTimeUtility::current_time();
   ObDDLSQLTransaction trans(schema_service_, true, false, false, false);
   ObSchemaService *schema_service = NULL;
   if (OB_FAIL(check_inner_stat())) {
@@ -21710,6 +21711,9 @@ int ObDDLService::create_sys_tenant(
       }
     }
   }
+  LOG_INFO("[UPGRADE] create sys tenant", KR(ret),
+           "tenant_id", tenant_schema.get_tenant_id(),
+           "cost", ObTimeUtility::current_time() - start_time);
   return ret;
 }
 
@@ -22753,17 +22757,17 @@ int ObDDLService::create_tenant_sys_ls(
       LOG_WARN("fail to create tenant sys ls", KR(ret), K(pool_list), K(palf_base_info),
                K(locality), K(paxos_replica_num), K(tenant_schema), K(zone_priority));
     } else {
-      share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
-      int64_t timeout = GCONF.rpc_timeout;
-      if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
-        timeout = max(timeout, THIS_WORKER.get_timeout_remain());
-      }
-      int64_t wait_leader_start = ObTimeUtility::current_time();
-      if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
-        LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
-      }
-      int64_t wait_leader_end = ObTimeUtility::current_time();
-      wait_leader = wait_leader_end - wait_leader_end;
+      // share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
+      // int64_t timeout = GCONF.rpc_timeout;
+      // if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
+      //   timeout = max(timeout, THIS_WORKER.get_timeout_remain());
+      // }
+      // int64_t wait_leader_start = ObTimeUtility::current_time();
+      // if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
+      //   LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
+      // }
+      // int64_t wait_leader_end = ObTimeUtility::current_time();
+      // wait_leader = wait_leader_end - wait_leader_end;
     }
   }
   if (is_meta_tenant(tenant_id)) {
@@ -22796,31 +22800,37 @@ int ObDDLService::broadcast_sys_table_schemas(
     ObArray<ObAddr> addrs;
     const ObLSReplica *leader = NULL;
     ObLSReplica::MemberList member_list;
-    if (OB_FAIL(lst_operator_->get(GCONF.cluster_id, tenant_id,
-        SYS_LS, share::ObLSTable::DEFAULT_MODE, ls_info))) {
-      LOG_WARN("fail to get sys ls info", KR(ret), K(tenant_id));
-    } else if (OB_FAIL(ls_info.find_leader(leader))) {
-      LOG_WARN("fail to get leader", KR(ret), K(tenant_id));
-    } else if (OB_ISNULL(leader)) {
-      ret = OB_LEADER_NOT_EXIST;
-      LOG_WARN("leader is null", KR(ret), K(tenant_id));
-    } else {
-      member_list = leader->get_member_list();
-      ARRAY_FOREACH_N(member_list, idx, cnt) {
-        const ObAddr &server = member_list.at(idx).get_server();
-        if (OB_UNLIKELY(!server.is_valid())) {
-          ret = OB_INVALID_ARGUMENT;
-          LOG_WARN("invalid server", KR(ret), K(server), K(member_list));
-        } else if (OB_FAIL(addrs.push_back(server))) {
-          LOG_WARN("fail to push back server", KR(ret), K(server), K(addrs));
-        }
-      }
-      if (OB_SUCC(ret)
-          && !is_contain(addrs, GCONF.self_addr_)
-          && OB_FAIL(addrs.push_back(GCONF.self_addr_))) {
-        LOG_WARN("fail to push back rs addr", KR(ret));
-      }
+    // if (OB_FAIL(lst_operator_->get(GCONF.cluster_id, tenant_id,
+    //     SYS_LS, share::ObLSTable::DEFAULT_MODE, ls_info))) {
+    //   LOG_WARN("fail to get sys ls info", KR(ret), K(tenant_id));
+    // } else if (OB_FAIL(ls_info.find_leader(leader))) {
+    //   LOG_WARN("fail to get leader", KR(ret), K(tenant_id));
+    // } else if (OB_ISNULL(leader)) {
+    //   ret = OB_LEADER_NOT_EXIST;
+    //   LOG_WARN("leader is null", KR(ret), K(tenant_id));
+    // } else {
+    //   member_list = leader->get_member_list();
+    //   ARRAY_FOREACH_N(member_list, idx, cnt) {
+    //     const ObAddr &server = member_list.at(idx).get_server();
+    //     if (OB_UNLIKELY(!server.is_valid())) {
+    //       ret = OB_INVALID_ARGUMENT;
+    //       LOG_WARN("invalid server", KR(ret), K(server), K(member_list));
+    //     } else if (OB_FAIL(addrs.push_back(server))) {
+    //       LOG_WARN("fail to push back server", KR(ret), K(server), K(addrs));
+    //     }
+    //   }
+    //   if (OB_SUCC(ret)
+    //       && !is_contain(addrs, GCONF.self_addr_)
+    //       && OB_FAIL(addrs.push_back(GCONF.self_addr_))) {
+    //     LOG_WARN("fail to push back rs addr", KR(ret));
+    //   }
+    // }
+    if (OB_SUCC(ret)
+        && !is_contain(addrs, GCONF.self_addr_)
+        && OB_FAIL(addrs.push_back(GCONF.self_addr_))) {
+      LOG_WARN("fail to push back rs addr", KR(ret));
     }
+    
     if (OB_SUCC(ret)) {
       ObTimeoutCtx ctx;
       ObBatchBroadcastSchemaProxy proxy(*rpc_proxy_,
@@ -22849,16 +22859,16 @@ int ObDDLService::broadcast_sys_table_schemas(
         LOG_WARN("wait batch result failed", KR(tmp_ret), KR(ret));
         ret = OB_SUCC(ret) ? tmp_ret : ret;
       }
-      for (int64_t i = 0; OB_SUCC(ret) && i < return_code_array.count(); i++) {
-        int res_ret = return_code_array.at(i);
-        const ObAddr &addr = proxy.get_dests().at(i);
-        if (OB_SUCCESS != res_ret
-            && (addr == leader->get_server()
-            || addr == GCONF.self_addr_)) { // leader and rs must succeed
-          ret = res_ret;
-          LOG_WARN("broadcast schema failed", KR(ret), K(addr), K(tenant_id));
-        }
-      } // end for
+      // for (int64_t i = 0; OB_SUCC(ret) && i < return_code_array.count(); i++) {
+      //   int res_ret = return_code_array.at(i);
+      //   const ObAddr &addr = proxy.get_dests().at(i);
+      //   if (OB_SUCCESS != res_ret
+      //       && (addr == leader->get_server()
+      //       || addr == GCONF.self_addr_)) { // leader and rs must succeed
+      //     ret = res_ret;
+      //     LOG_WARN("broadcast schema failed", KR(ret), K(addr), K(tenant_id));
+      //   }
+      // } // end for
     }
   }
   LOG_INFO("[CREATE_TENANT] STEP 2.2. finish broadcast sys table schemas", KR(ret), K(tenant_id),
@@ -23333,7 +23343,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     th.join();
   }
   
-  batch_count = other_tables.count() / 32;
+  batch_count = other_tables.count() / 16;
   begin = 0;
   ths.clear();
   for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {

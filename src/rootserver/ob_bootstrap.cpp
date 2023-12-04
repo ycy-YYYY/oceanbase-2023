@@ -1297,6 +1297,7 @@ int ObBootstrap::create_sys_tenant()
 {
   // insert zero system stat value for create system tenant.
   int ret= OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   ObTenantSchema tenant;
   if (OB_FAIL(check_inner_stat())) {
     LOG_WARN("check_inner_stat failed", K(ret));
@@ -1354,6 +1355,7 @@ int ObBootstrap::create_sys_tenant()
   }
 
   LOG_INFO("create tenant", K(ret), K(tenant));
+  LOG_INFO("finish create sys tenant", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   BOOTSTRAP_CHECK_SUCCESS();
   return ret;
 }
@@ -1696,7 +1698,7 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
         if (OB_FAIL(core_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back core table", KR(ret), K(table_schemas.at(i)));
         }
-      } else if (table_schemas.at(i).is_table()) {
+      } else if (table_schemas.at(i).is_table() || is_system_table(table_schemas.at(i).get_table_id())) {
         if (OB_FAIL(data_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back data table", KR(ret), K(table_schemas.at(i)));
         }
