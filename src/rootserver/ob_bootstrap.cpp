@@ -1457,6 +1457,7 @@ int ObBootstrap::init_sys_unit_config(share::ObUnitConfig &unit_config)
 int ObBootstrap::create_sys_unit_config()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   ObUnitConfig unit_config;
   const bool if_not_exist = true;
   if (OB_FAIL(check_inner_stat())) {
@@ -1466,6 +1467,7 @@ int ObBootstrap::create_sys_unit_config()
   } else if (OB_FAIL(unit_mgr_.create_unit_config(unit_config, if_not_exist))) {
     LOG_WARN("create_unit_config failed", K(unit_config), K(if_not_exist), K(ret));
   }
+  LOG_INFO("finish create sys unit config", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   BOOTSTRAP_CHECK_SUCCESS();
   return ret;
 }
@@ -1488,6 +1490,7 @@ int ObBootstrap::gen_sys_resource_pool(
 int ObBootstrap::create_sys_resource_pool()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   ObArray<ObUnit> sys_units;
   ObArray<ObResourcePoolName> pool_names;
   share::ObResourcePool pool;
@@ -1530,6 +1533,7 @@ int ObBootstrap::create_sys_resource_pool()
       ret = (OB_SUCCESS == ret) ? temp_ret : ret;
     }
   }
+  LOG_INFO("finish create sys resource pool", K(ret), "costYcy", ObTimeUtility::current_time() - begin_ts);
   BOOTSTRAP_CHECK_SUCCESS();
   return ret;
 }

@@ -76,6 +76,7 @@ int ObGlobalStatProxy::set_tenant_init_global_stat(
     const uint64_t current_data_version)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_time = ObTimeUtility::current_time();
   if (!is_valid() || core_schema_version <= 0
       || baseline_schema_version < OB_INVALID_VERSION
       || !snapshot_gc_scn.is_valid()
@@ -99,6 +100,8 @@ int ObGlobalStatProxy::set_tenant_init_global_stat(
       LOG_WARN("update failed", KR(ret), K(list));
     }
   }
+  LOG_INFO("set_tenant_init_global_stat", KR(ret),
+           "costYcy", ObTimeUtility::current_time() - begin_time);
   return ret;
 }
 

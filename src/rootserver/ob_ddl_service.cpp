@@ -23065,6 +23065,7 @@ int ObDDLService::init_tenant_schema(
           }
         }
       }
+      
 
       common::ObMySQLTransaction trans;
       if (OB_FAIL(ret)) {
@@ -23095,7 +23096,9 @@ int ObDDLService::init_tenant_schema(
         }
       }
     }
-
+    
+    LOG_INFO("costYcy", "cost", ObTimeUtility::fast_current_time() - start_time, "tenant_id", tenant_id);
+    
     // 2. init tenant schema
     if (OB_SUCC(ret)) {
       ObDDLSQLTransaction trans(schema_service_, true, true, false, false);

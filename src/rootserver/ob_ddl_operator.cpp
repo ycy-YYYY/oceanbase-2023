@@ -11,9 +11,11 @@
  */
 
 #include "lib/container/ob_iarray.h"
+#include "lib/oblog/ob_log_module.h"
 #include "lib/utility/ob_macro_utils.h"
 #include "share/schema/ob_schema_struct.h"
 #include <cstddef>
+#include <cstdint>
 #define USING_LOG_PREFIX RS
 #include "rootserver/ob_ddl_operator.h"
 
@@ -220,6 +222,7 @@ int ObDDLOperator::insert_tenant_merge_info(
     ObMySQLTransaction &trans)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const uint64_t tenant_id = tenant_schema.get_tenant_id();
   if (is_sys_tenant(tenant_id) || is_meta_tenant(tenant_id)) {
     // add zone merge info
@@ -272,6 +275,8 @@ int ObDDLOperator::insert_tenant_merge_info(
     }
   }
 
+  LOG_INFO("insert tenant merge info", KR(ret), K(tenant_id),
+      "cost", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
@@ -5173,6 +5178,7 @@ int ObDDLOperator::init_tenant_env(
     ObMySQLTransaction &trans)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const uint64_t tenant_id = tenant_schema.get_tenant_id();
 
   if (OB_UNLIKELY(!recovery_until_scn.is_valid_and_not_min())) {
@@ -5224,7 +5230,8 @@ int ObDDLOperator::init_tenant_env(
       LOG_WARN("failed to init tenant info", KR(ret), K(tenant_info));
     }
   }
-
+  LOG_INFO("init tenant env", K(ret), K(tenant_id),
+           "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 
