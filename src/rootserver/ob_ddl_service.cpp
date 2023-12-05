@@ -13,6 +13,7 @@
 #include "lib/container/ob_array_serialization.h"
 #include "lib/ob_define.h"
 #include "lib/oblog/ob_log_module.h"
+#include "lib/thread/ob_thread_name.h"
 #include "lib/utility/ob_macro_utils.h"
 #include "share/schema/ob_schema_struct.h"
 #include <vector>
@@ -26533,6 +26534,16 @@ int ObDDLService::refresh_schema(uint64_t tenant_id, int64_t *publish_schema_ver
   return ret;
 }
 
+int ObDDLService::refresh_schema_async(const uint64_t tenant_id) {
+  std::thread th ([this,tenant_id](){
+    set_thread_name("RefreshSchema",0);
+    refresh_schema(tenant_id);
+  });
+  th.detach();
+  return OB_SUCCESS;
+}
+
+
 int ObDDLService::check_tenant_has_been_dropped_(
     const uint64_t tenant_id,
     bool &is_dropped)
@@ -26692,7 +26703,7 @@ int ObDDLService::publish_schema(uint64_t tenant_id /*=OB_INVALID_TENANT_ID*/)
   } else if (OB_FAIL(publish_schema(tenant_id, addrs))) {
     LOG_WARN("fail to pubish schema", K(ret), K(tenant_id));
   }
-
+ 
   return OB_SUCCESS;
 }
 
