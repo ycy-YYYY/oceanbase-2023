@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+
 #define USING_LOG_PREFIX SHARE
 
 #include "share/ob_tenant_info_proxy.h"
@@ -387,6 +388,7 @@ int ObAllTenantInfoProxy::load_pure_tenant_info_(const uint64_t tenant_id,
                                            ObAllTenantInfo &tenant_info)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_time = ObTimeUtility::current_time();
   ObTimeoutCtx ctx;
   tenant_info.reset();
   if (OB_ISNULL(proxy)) {
@@ -421,6 +423,7 @@ int ObAllTenantInfoProxy::load_pure_tenant_info_(const uint64_t tenant_id,
       }
     }//end else
   }
+  LOG_INFO("load_pure_tenant_info","cost", ObTimeUtility::current_time() - begin_time, K(tenant_id), K(tenant_info));
   return ret;
 }
 

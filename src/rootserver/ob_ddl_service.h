@@ -2041,6 +2041,11 @@ private:
   int create_tenant_sys_tablets(
       const uint64_t tenant_id,
       common::ObIArray<share::schema::ObTableSchema> &tables);
+    
+  int create_tenant_sys_tablets_async(
+        const uint64_t tenant_id,
+        common::ObIArray<share::schema::ObTableSchema> &tables);
+
   int init_tenant_schema(
       const uint64_t tenant_id,
       const share::schema::ObTenantSchema &tenant_schema,

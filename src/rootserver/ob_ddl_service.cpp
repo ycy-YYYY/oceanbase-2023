@@ -22628,7 +22628,7 @@ int ObDDLService::create_normal_tenant(
     LOG_WARN("fail to get inner table schemas in tenant space", KR(ret), K(tenant_id));
   } else if (OB_FAIL(broadcast_sys_table_schemas(tenant_id, tables))) {
     LOG_WARN("fail to broadcast sys table schemas", KR(ret), K(tenant_id));
-  } else if (OB_FAIL(create_tenant_sys_tablets(tenant_id, tables))) {
+  } else if (OB_FAIL(create_tenant_sys_tablets_async(tenant_id, tables))) {
     LOG_WARN("fail to create tenant partitions", KR(ret), K(tenant_id));
   } else if (OB_FAIL(init_tenant_schema(tenant_id, tenant_schema,
              tenant_role, recovery_until_scn, tables, sys_variable, init_configs,
@@ -22875,6 +22875,22 @@ int ObDDLService::broadcast_sys_table_schemas(
   LOG_INFO("[CREATE_TENANT] STEP 2.2. finish broadcast sys table schemas", KR(ret), K(tenant_id),
            "cost", ObTimeUtility::fast_current_time() - start_time);
   return ret;
+}
+
+
+int ObDDLService::create_tenant_sys_tablets_async(
+    const uint64_t tenant_id,
+    common::ObIArray<ObTableSchema> &tables)
+{
+  std::thread ths ([this,tenant_id,&tables](){
+    int ret = OB_SUCCESS;
+    set_thread_name("create_tenant_sys_tablets_async",0);
+    if (OB_FAIL(create_tenant_sys_tablets(tenant_id, tables))) {
+      LOG_WARN("fail to create tenant partitions", KR(ret), K(tenant_id));
+    }
+  });
+  ths.detach();
+  return OB_SUCCESS;
 }
 
 int ObDDLService::create_tenant_sys_tablets(
