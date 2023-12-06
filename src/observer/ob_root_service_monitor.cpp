@@ -160,21 +160,23 @@ int ObRootServiceMonitor::monitor_root_service()
           //DEBUG_SYNC(BEFORE_STOP_RS);
           //leader does not exist.
           if (!root_service_.is_start()) {
+            FLOG_INFO("root service is not start, no need to stop");
+            try_start_root_service();
             //nothing todo
           } else {
-            if (OB_FAIL(root_service_.revoke_rs())) {
-              FLOG_WARN("fail to revoke rootservice", KR(ret));
-              if (root_service_.is_need_stop()) {
-                //nothing todo
-              } else if (root_service_.is_stopping()) {
-                if (OB_FAIL(root_service_.stop_service())) {
-                  FLOG_WARN("root_service stop_service failed", KR(ret));
-                }
-              } else {
-                ret = OB_ERR_UNEXPECTED;
-                FLOG_WARN("inalid root service status", KR(ret));
-              }
-            }
+            // if (OB_FAIL(root_service_.revoke_rs())) {
+            //   FLOG_WARN("fail to revoke rootservice", KR(ret));
+            //   if (root_service_.is_need_stop()) {
+            //     //nothing todo
+            //   } else if (root_service_.is_stopping()) {
+            //     if (OB_FAIL(root_service_.stop_service())) {
+            //       FLOG_WARN("root_service stop_service failed", KR(ret));
+            //     }
+            //   } else {
+            //     ret = OB_ERR_UNEXPECTED;
+            //     FLOG_WARN("inalid root service status", KR(ret));
+            //   }
+            // }
           }
         }
       }
@@ -214,64 +216,64 @@ int ObRootServiceMonitor::try_start_root_service()
     ret = OB_ERR_UNEXPECTED;
     FLOG_WARN("rs_list should not has no member", KR(ret), K(rs_list), "count", rs_list.count());
   } else {
-    int64_t timeout = GCONF.rpc_timeout;
-    int64_t count = 0;
-    rootserver::ObGetRootserverRoleProxy proxy(
-        *GCTX.srv_rpc_proxy_, &obrpc::ObSrvRpcProxy::get_root_server_status);
-    ObDetectMasterRsArg arg;
-    for (int64_t i = 0; i < rs_list.count(); i++) {
-      ObAddr &addr = rs_list.at(i);
-      if (!addr.is_valid() || GCTX.self_addr() == addr) {
-        // do nothing, no need to check self
-      } else if (OB_SUCCESS != (tmp_ret = arg.init(addr, cluster_id))) {
-        // cluster_id is useless, but we want to reuse ObDetectMasterRsArg here
-        need_to_wait = true;
-        FLOG_WARN("need to wait because fail to init arg", KR(tmp_ret), K(addr), K(cluster_id));
-      } else if (FALSE_IT(count++)) {
-        // shall never be here
-      } else if (OB_SUCCESS != (tmp_ret = proxy.call(addr, timeout, OB_SYS_TENANT_ID, arg))) {
-        need_to_wait = true;
-        FLOG_WARN("need to wait because fail to send rpc", KR(tmp_ret), K(addr), K(timeout), K(arg));
-      }
-    }
+    // int64_t timeout = GCONF.rpc_timeout;
+    // int64_t count = 0;
+    // rootserver::ObGetRootserverRoleProxy proxy(
+    //     *GCTX.srv_rpc_proxy_, &obrpc::ObSrvRpcProxy::get_root_server_status);
+    // ObDetectMasterRsArg arg;
+    // for (int64_t i = 0; i < rs_list.count(); i++) {
+    //   ObAddr &addr = rs_list.at(i);
+    //   if (!addr.is_valid() || GCTX.self_addr() == addr) {
+    //     // do nothing, no need to check self
+    //   } else if (OB_SUCCESS != (tmp_ret = arg.init(addr, cluster_id))) {
+    //     // cluster_id is useless, but we want to reuse ObDetectMasterRsArg here
+    //     need_to_wait = true;
+    //     FLOG_WARN("need to wait because fail to init arg", KR(tmp_ret), K(addr), K(cluster_id));
+    //   } else if (FALSE_IT(count++)) {
+    //     // shall never be here
+    //   } else if (OB_SUCCESS != (tmp_ret = proxy.call(addr, timeout, OB_SYS_TENANT_ID, arg))) {
+    //     need_to_wait = true;
+    //     FLOG_WARN("need to wait because fail to send rpc", KR(tmp_ret), K(addr), K(timeout), K(arg));
+    //   }
+    // }
 
-    ObArray<int> return_ret_array;
-    if (OB_SUCCESS != (tmp_ret = proxy.wait_all(return_ret_array))) {
-      // ignore ret
-      need_to_wait = true;
-      FLOG_WARN("need to wait because wait batch result failed", KR(tmp_ret));
-    } else if (return_ret_array.count() != count) {
-      //ignore ret
-      need_to_wait = true;
-      FLOG_WARN("need to wait because send rpc count should match return rpc count", K(count),
-               "return_ret_array count", return_ret_array.count());
-    } else {
-      for (int64_t i = 0; OB_SUCC(ret) && i < return_ret_array.count(); i++) {
-        int return_ret = return_ret_array.at(i);
-        const ObAddr &addr = proxy.get_dests().at(i);
-        if (OB_SUCCESS == return_ret) {
-          // need to check that server is leader or !status::init
-          const ObGetRootserverRoleResult *result = proxy.get_results().at(i);
-          if (OB_ISNULL(result)) {
-            //ignore ret
-            need_to_wait = true;
-            FLOG_WARN("need to wait because result is null", KR(ret), K(addr));
-          } else if (is_strong_leader(result->get_role())) {
-            ret = OB_NOT_MASTER;
-            FLOG_WARN("a new leader may elected", KR(ret), K(addr),
-                     "status", result->get_status(), "role", result->get_role());
-          } else if (result->get_status() != status::INIT) {
-            //old rs may not stop
-            need_to_wait = true;
-            FLOG_WARN("need to wait because another root server already exist", K(addr),
-                     "status", result->get_status(), "role", result->get_role());
-          }
-        } else {
-          need_to_wait = true;
-          FLOG_WARN("need to wait because failed to get result", KR(ret), K(addr));
-        }
-      }
-    }
+    // ObArray<int> return_ret_array;
+    // if (OB_SUCCESS != (tmp_ret = proxy.wait_all(return_ret_array))) {
+    //   // ignore ret
+    //   need_to_wait = true;
+    //   FLOG_WARN("need to wait because wait batch result failed", KR(tmp_ret));
+    // } else if (return_ret_array.count() != count) {
+    //   //ignore ret
+    //   need_to_wait = true;
+    //   FLOG_WARN("need to wait because send rpc count should match return rpc count", K(count),
+    //            "return_ret_array count", return_ret_array.count());
+    // } else {
+    //   for (int64_t i = 0; OB_SUCC(ret) && i < return_ret_array.count(); i++) {
+    //     int return_ret = return_ret_array.at(i);
+    //     const ObAddr &addr = proxy.get_dests().at(i);
+    //     if (OB_SUCCESS == return_ret) {
+    //       // need to check that server is leader or !status::init
+    //       const ObGetRootserverRoleResult *result = proxy.get_results().at(i);
+    //       if (OB_ISNULL(result)) {
+    //         //ignore ret
+    //         need_to_wait = true;
+    //         FLOG_WARN("need to wait because result is null", KR(ret), K(addr));
+    //       } else if (is_strong_leader(result->get_role())) {
+    //         ret = OB_NOT_MASTER;
+    //         FLOG_WARN("a new leader may elected", KR(ret), K(addr),
+    //                  "status", result->get_status(), "role", result->get_role());
+    //       } else if (result->get_status() != status::INIT) {
+    //         //old rs may not stop
+    //         need_to_wait = true;
+    //         FLOG_WARN("need to wait because another root server already exist", K(addr),
+    //                  "status", result->get_status(), "role", result->get_role());
+    //       }
+    //     } else {
+    //       need_to_wait = true;
+    //       FLOG_WARN("need to wait because failed to get result", KR(ret), K(addr));
+    //     }
+    //   }
+    // }
 
     if (OB_FAIL(ret)) {
       // OB_FAIL(ret) will occur only if any server said its role is leader,

@@ -1052,9 +1052,9 @@ int ObRootService::start_service()
     FLOG_WARN("rootservice not inited", KR(ret));
   } else if (OB_FAIL(rs_status_.set_rs_status(status::STARTING))) {
     FLOG_WARN("fail to set rs status", KR(ret));
-  } else if (!ObRootServiceRoleChecker::is_rootserver()) {
-    ret = OB_NOT_MASTER;
-    FLOG_WARN("not master", KR(ret));
+  // } else if (!ObRootServiceRoleChecker::is_rootserver()) {
+  //   ret = OB_NOT_MASTER;
+  //   FLOG_WARN("not master", KR(ret));
   } else {
     sql_proxy_.set_active();
     oracle_sql_proxy_.set_active();

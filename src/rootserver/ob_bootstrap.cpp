@@ -431,19 +431,20 @@ int ObPreBootstrap::wait_elect_ls(
 {
   int ret = OB_SUCCESS;
   int64_t begin_ts = ObTimeUtility::current_time();
-  const uint64_t tenant_id = OB_SYS_TENANT_ID;
+  // const uint64_t tenant_id = OB_SYS_TENANT_ID;
 
-  int64_t timeout = WAIT_ELECT_SYS_LEADER_TIMEOUT_US;
-  if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
-    timeout = max(timeout, THIS_WORKER.get_timeout_remain());
-  }
+  // int64_t timeout = WAIT_ELECT_SYS_LEADER_TIMEOUT_US;
+  // if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
+  //   timeout = max(timeout, THIS_WORKER.get_timeout_remain());
+  // }
 
-  if (OB_FAIL(check_inner_stat())) {
-    LOG_WARN("check_inner_stat failed", K(ret));
-  } else if (OB_FAIL(ls_leader_waiter_.wait(
-      tenant_id, SYS_LS, timeout, master_rs))) {
-    LOG_WARN("leader_waiter_ wait failed", K(tenant_id), K(SYS_LS), K(timeout), K(ret));
-  }
+  // if (OB_FAIL(check_inner_stat())) {
+  //   LOG_WARN("check_inner_stat failed", K(ret));
+  // } else if (OB_FAIL(ls_leader_waiter_.wait(
+  //     tenant_id, SYS_LS, timeout, master_rs))) {
+  //   LOG_WARN("leader_waiter_ wait failed", K(tenant_id), K(SYS_LS), K(timeout), K(ret));
+  // }
+  master_rs = GCTX.self_addr();
   if (OB_SUCC(ret)) {
     ObTaskController::get().allow_next_syslog();
     LOG_INFO("succeed to wait elect log stream");
