@@ -595,7 +595,7 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
     LOG_WARN("construct all schema fail", K(ret));
   } else if (OB_FAIL(broadcast_sys_schema(table_schemas))) {
     LOG_WARN("broadcast_sys_schemas failed", K(table_schemas), K(ret));
-  } else if (OB_FAIL(create_all_partitions())) {
+  } else if (OB_FAIL(create_all_partitions_async())) {
     LOG_WARN("create all partitions fail", K(ret));
   } else if (OB_FAIL(create_all_schema(ddl_service_, table_schemas))) {
     LOG_WARN("create_all_schema failed",  K(table_schemas), K(ret));
@@ -785,6 +785,7 @@ int ObBootstrap::create_all_core_table_partition()
 int ObBootstrap::create_all_partitions()
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   ObArray<uint64_t> sys_table_ids;
   ObArray<int64_t> partition_nums;
 
@@ -831,8 +832,17 @@ int ObBootstrap::create_all_partitions()
       }
     }
   }
+  LOG_INFO("finish creating system tables", K(ret),"costYcy", ObTimeUtility::current_time() - begin_ts);
+  return ret;
+}
 
-  LOG_INFO("finish creating system tables", K(ret));
+int ObBootstrap::create_all_partitions_async()
+{
+  int ret = OB_SUCCESS;
+  std::thread ths([this](){
+    create_all_partitions();
+  });
+  ths.detach();
   BOOTSTRAP_CHECK_SUCCESS();
   return ret;
 }

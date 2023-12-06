@@ -148,6 +148,7 @@ public:
       common::ObIArray<share::schema::ObTableSchema> &table_schemas);
   int sort_schema(const common::ObIArray<share::schema::ObTableSchema> &table_schemas,
                   common::ObIArray<share::schema::ObTableSchema> &sort_table_schemas);
+  int create_all_partitions_async();
 private:
   static const int64_t HEAT_BEAT_INTERVAL_US = 2 * 1000 * 1000; //2s
   static const int64_t WAIT_RS_IN_SERVICE_TIMEOUT_US = 40 * 1000 * 1000; //40s

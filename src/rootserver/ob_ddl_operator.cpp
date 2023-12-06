@@ -1563,6 +1563,7 @@ int ObDDLOperator::batch_create_core_tables(ObIArray<ObTableSchema> &table_schem
                                             const ObString *ddl_stmt_str/*=NULL*/)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_time = ObTimeUtility::current_time();
   const uint64_t tenant_id = table_schemas.at(0).get_tenant_id();
   int64_t new_schema_version = OB_INVALID_VERSION;
   ObSchemaService *schema_service = schema_service_.get_schema_service();
@@ -1593,7 +1594,8 @@ int ObDDLOperator::batch_create_core_tables(ObIArray<ObTableSchema> &table_schem
     if (OB_FAIL(create_table(table_schema, trans,nullptr,true,false))){
       RS_LOG(WARN, "failed to create table", K(ret));
     }
-    
+    LOG_INFO("batch create core tables", K(table_schemas.count()), K(tenant_id),
+             "cost_time", ObTimeUtility::current_time() - begin_time);
     // set core schema version
   }
   return ret;
