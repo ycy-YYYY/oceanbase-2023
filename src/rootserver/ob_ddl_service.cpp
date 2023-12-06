@@ -10,12 +10,8 @@
  * See the Mulan PubL v2 for more details.
  */
 
-#include "lib/container/ob_array_serialization.h"
-#include "lib/ob_define.h"
-#include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
-#include "lib/utility/ob_macro_utils.h"
-#include "share/schema/ob_schema_struct.h"
+#include <memory>
 #include <vector>
 #include <thread>
 #define USING_LOG_PREFIX RS
@@ -22628,7 +22624,7 @@ int ObDDLService::create_normal_tenant(
     LOG_WARN("fail to get inner table schemas in tenant space", KR(ret), K(tenant_id));
   } else if (OB_FAIL(broadcast_sys_table_schemas(tenant_id, tables))) {
     LOG_WARN("fail to broadcast sys table schemas", KR(ret), K(tenant_id));
-  } else if (OB_FAIL(create_tenant_sys_tablets_async(tenant_id, tables))) {
+  } else if (OB_FAIL(create_tenant_sys_tablets(tenant_id, tables))) {
     LOG_WARN("fail to create tenant partitions", KR(ret), K(tenant_id));
   } else if (OB_FAIL(init_tenant_schema(tenant_id, tenant_schema,
              tenant_role, recovery_until_scn, tables, sys_variable, init_configs,
@@ -22882,13 +22878,19 @@ int ObDDLService::create_tenant_sys_tablets_async(
     const uint64_t tenant_id,
     common::ObIArray<ObTableSchema> &tables)
 {
-  std::thread ths ([this,tenant_id,&tables](){
+  ObSArray<ObTableSchema> *tmp_tables = new ObSArray<ObTableSchema>();
+  for (int i = 0; i < tables.count(); i++) {
+    tmp_tables->push_back(tables.at(i));
+  }
+  
+  std::unique_ptr<common::ObIArray<ObTableSchema>> tables_ptr(tmp_tables);
+  std::thread ths ([this,tenant_id](std::unique_ptr<common::ObIArray<ObTableSchema>> tables_ptr){
     int ret = OB_SUCCESS;
     set_thread_name("create_tenant_sys_tablets_async",0);
-    if (OB_FAIL(create_tenant_sys_tablets(tenant_id, tables))) {
+    if (OB_FAIL(create_tenant_sys_tablets(tenant_id, *tables_ptr))) {
       LOG_WARN("fail to create tenant partitions", KR(ret), K(tenant_id));
     }
-  });
+  },std::move(tables_ptr));
   ths.detach();
   return OB_SUCCESS;
 }
