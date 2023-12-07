@@ -1709,11 +1709,12 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
   ObSArray<ObTableSchema> data_tables;
     
   for (int64_t i = 0; OB_SUCC(ret) && i < table_schemas.count(); ++i) {
+      ObTableSchema &table_schema = table_schemas.at(i);
       if (is_core_table(table_schemas.at(i).get_table_id())) {
         if (OB_FAIL(core_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back core table", KR(ret), K(table_schemas.at(i)));
         }
-      } else if (table_schemas.at(i).is_table() || is_system_table(table_schemas.at(i).get_table_id())) {
+      } else if (!(table_schema.is_index_table() || table_schema.is_materialized_view() || table_schema.is_aux_vp_table() || table_schema.is_aux_lob_table())) {
         if (OB_FAIL(data_tables.push_back(table_schemas.at(i)))) {
           LOG_WARN("fail to push back data table", KR(ret), K(table_schemas.at(i)));
         }
@@ -1738,9 +1739,12 @@ int ObBootstrap::parallel_batch_create_schema(ObDDLService &ddl_service, ObIArra
   ths.emplace_back(std::move(tmp));
 
   
-  int64_t batch_count = data_tables.count() / 16;
+  int64_t batch_count = data_tables.count() / 15;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
     if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
+      if (data_tables.count() == i + 2){
+        ++i;
+      }
       std::thread th([&, begin, i, cur_trace_id] () {
         int ret = OB_SUCCESS;
         ObCurTraceId::set(*cur_trace_id);

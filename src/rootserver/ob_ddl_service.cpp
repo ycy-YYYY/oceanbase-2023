@@ -23297,7 +23297,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
         if (OB_FAIL(core_tables.push_back(table))) {
           LOG_WARN("fail to push back core table", KR(ret), K(table));
         }
-      } else if (table.is_table()) {
+      } else if (!(table.is_index_table() || table.is_materialized_view() || table.is_aux_vp_table() || table.is_aux_lob_table())) {
         if (OB_FAIL(data_tables.push_back(table))) {
           LOG_WARN("fail to push back data table", KR(ret), K(table));
         }
@@ -23329,7 +23329,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     }
   });
   
-  int64_t batch_count = data_tables.count() / 16;
+  int64_t batch_count = data_tables.count() / 15;
   int begin = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
     if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {

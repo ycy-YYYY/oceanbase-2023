@@ -2843,6 +2843,8 @@ int ObMultiVersionSchemaService::refresh_tenant_schema(
       }
     }
 
+    FLOG_INFO("[REFRESH_SCHEMA] start to add schema by tenant", K(tenant_id));
+    
     if (OB_SUCC(ret)) {
       bool need_refresh = true;
       int64_t baseline_schema_version = OB_INVALID_VERSION;
@@ -2870,6 +2872,8 @@ int ObMultiVersionSchemaService::refresh_tenant_schema(
           }
         }
       }
+      
+      FLOG_INFO("[REFRESH_SCHEMA] start toby tenant", K(tenant_id));
 
       if (OB_SUCC(ret) && need_refresh) {
         if (OB_FAIL(refresh_schema(refresh_schema_status))) {
@@ -4087,6 +4091,7 @@ int ObMultiVersionSchemaService::set_tenant_received_broadcast_version(
     const int64_t version)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   if (OB_INVALID_TENANT_ID == tenant_id) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid tenant_id", K(ret), K(tenant_id), K(version));
@@ -4101,6 +4106,10 @@ int ObMultiVersionSchemaService::set_tenant_received_broadcast_version(
     }
   } else {
     ret = OB_OLD_SCHEMA_VERSION;
+  }
+  int64_t cost_ts = ObTimeUtility::current_time() - begin_ts;
+  if (cost_ts > 1000) {
+    LOG_INFO("set tenant received broadcast version cost too much time", K(ret), K(tenant_id), K(version), K(cost_ts));
   }
   return ret;
 }

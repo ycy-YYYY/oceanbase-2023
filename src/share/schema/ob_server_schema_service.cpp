@@ -6397,12 +6397,16 @@ int ObServerSchemaService::get_schema_version_in_inner_table(
     int64_t &target_version)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   const uint64_t tenant_id = schema_status.tenant_id_;
   const bool did_use_weak = (schema_status.snapshot_timestamp_ >= 0);
   if (OB_FAIL(schema_service_->fetch_schema_version(
       schema_status, sql_client, target_version))) {
     LOG_WARN("fail to fetch schema version", K(ret), K(schema_status));
   }
+  int64_t end_ts = ObTimeUtility::current_time();
+  LOG_INFO("fetch schema version", K(ret), K(schema_status), K(target_version),
+           "cost", end_ts - begin_ts, K(did_use_weak));
   return ret;
 }
 
