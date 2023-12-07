@@ -8821,6 +8821,7 @@ int ObRootService::refresh_server(const bool load_frozen_status, const bool need
 int ObRootService::refresh_schema(const bool load_frozen_status)
 {
   int ret = OB_SUCCESS;
+  int64_t begin_ts = ObTimeUtility::current_time();
   if (!inited_) {
     ret = OB_NOT_INIT;
     LOG_WARN("not init", K(ret));
@@ -8851,6 +8852,8 @@ int ObRootService::refresh_schema(const bool load_frozen_status)
       }
     }
   }
+  LOG_INFO("refresh schema success", K(load_frozen_status), K(ret),
+           "cost_us", ObTimeUtility::current_time() - begin_ts);
   return ret;
 }
 

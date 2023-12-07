@@ -56,6 +56,7 @@ int check_sys_var_options(ObExecContext &ctx,
 int ObCreateTenantExecutor::execute(ObExecContext &ctx, ObCreateTenantStmt &stmt)
 {
   int ret = OB_SUCCESS;
+  int tmp_ret = OB_SUCCESS;
   int64_t start_ts = ObTimeUtility::current_time();
   ObTaskExecutorCtx *task_exec_ctx = NULL;
   obrpc::ObCommonRpcProxy *common_rpc_proxy = NULL;
@@ -90,20 +91,19 @@ int ObCreateTenantExecutor::execute(ObExecContext &ctx, ObCreateTenantStmt &stmt
   } else if (OB_ISNULL(common_rpc_proxy = task_exec_ctx->get_common_rpc())) {
     ret = OB_NOT_INIT;
     LOG_WARN("get common rpc proxy failed");
-  } else if (OB_FAIL(common_rpc_proxy->create_tenant(create_tenant_arg, tenant_id))) {
+  } else if (OB_TMP_FAIL(common_rpc_proxy->to_addr(ctx.get_addr()).timeout(2_s).create_tenant(create_tenant_arg, tenant_id))) {
     LOG_WARN("rpc proxy create tenant failed", K(ret));
   } else if (!create_tenant_arg.if_not_exist_ && OB_INVALID_ID == tenant_id) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("if_not_exist not set and tenant_id invalid tenant_id", K(create_tenant_arg), K(tenant_id), K(ret));
+  } else if (OB_INVALID_ID != tenant_id) {
+    int tmp_ret = OB_SUCCESS; // try refresh schema and wait ls valid
+    if (OB_TMP_FAIL(wait_schema_refreshed_(tenant_id))) {
+      LOG_WARN("fail to wait schema refreshed", KR(tmp_ret), K(tenant_id));
+    } else if (OB_TMP_FAIL(wait_user_ls_valid_(tenant_id))) {
+      LOG_WARN("failed to wait user ls valid, but ignore", KR(tmp_ret), K(tenant_id));
+    }
   }
-  // } else if (OB_INVALID_ID != tenant_id) {
-  //   int tmp_ret = OB_SUCCESS; // try refresh schema and wait ls valid
-  //   if (OB_TMP_FAIL(wait_schema_refreshed_(tenant_id))) {
-  //     LOG_WARN("fail to wait schema refreshed", KR(tmp_ret), K(tenant_id));
-  //   } else if (OB_TMP_FAIL(wait_user_ls_valid_(tenant_id))) {
-  //     LOG_WARN("failed to wait user ls valid, but ignore", KR(tmp_ret), K(tenant_id));
-  //   }
-  // }
   LOG_INFO("[CREATE TENANT] create tenant", KR(ret), K(create_tenant_arg),
            "cost", ObTimeUtility::current_time() - start_ts);
   return ret;
