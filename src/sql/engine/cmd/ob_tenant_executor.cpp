@@ -96,14 +96,15 @@ int ObCreateTenantExecutor::execute(ObExecContext &ctx, ObCreateTenantStmt &stmt
   } else if (!create_tenant_arg.if_not_exist_ && OB_INVALID_ID == tenant_id) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("if_not_exist not set and tenant_id invalid tenant_id", K(create_tenant_arg), K(tenant_id), K(ret));
-  } else if (OB_INVALID_ID != tenant_id) {
-    int tmp_ret = OB_SUCCESS; // try refresh schema and wait ls valid
-    if (OB_TMP_FAIL(wait_schema_refreshed_(tenant_id))) {
-      LOG_WARN("fail to wait schema refreshed", KR(tmp_ret), K(tenant_id));
-    } else if (OB_TMP_FAIL(wait_user_ls_valid_(tenant_id))) {
-      LOG_WARN("failed to wait user ls valid, but ignore", KR(tmp_ret), K(tenant_id));
-    }
   }
+  // } else if (OB_INVALID_ID != tenant_id) {
+  //   int tmp_ret = OB_SUCCESS; // try refresh schema and wait ls valid
+  //   if (OB_TMP_FAIL(wait_schema_refreshed_(tenant_id))) {
+  //     LOG_WARN("fail to wait schema refreshed", KR(tmp_ret), K(tenant_id));
+  //   } else if (OB_TMP_FAIL(wait_user_ls_valid_(tenant_id))) {
+  //     LOG_WARN("failed to wait user ls valid, but ignore", KR(tmp_ret), K(tenant_id));
+  //   }
+  // }
   LOG_INFO("[CREATE TENANT] create tenant", KR(ret), K(create_tenant_arg),
            "cost", ObTimeUtility::current_time() - start_ts);
   return ret;
@@ -135,12 +136,6 @@ int ObCreateTenantExecutor::wait_schema_refreshed_(const uint64_t tenant_id)
     } else {
       int tmp_ret = OB_SUCCESS;
       if (OB_TMP_FAIL(GSCHEMASERVICE.get_tenant_refreshed_schema_version(
-          meta_tenant_id, meta_schema_version))) {
-        if (OB_ENTRY_NOT_EXIST != tmp_ret) {
-          ret = tmp_ret;
-          LOG_WARN("get refreshed schema version failed", KR(ret), K(meta_tenant_id));
-        }
-      } else if (OB_TMP_FAIL(GSCHEMASERVICE.get_tenant_refreshed_schema_version(
           user_tenant_id, user_schema_version))) {
         if (OB_ENTRY_NOT_EXIST != tmp_ret) {
           ret = tmp_ret;
@@ -148,8 +143,7 @@ int ObCreateTenantExecutor::wait_schema_refreshed_(const uint64_t tenant_id)
         }
       }
       if (OB_FAIL(ret)) {
-      } else if (ObSchemaService::is_formal_version(meta_schema_version)
-                 && ObSchemaService::is_formal_version(user_schema_version)) {
+      } else if (ObSchemaService::is_formal_version(user_schema_version)) {
         break;
       } else {
         LOG_INFO("wait schema refreshed", K(tenant_id), K(meta_schema_version), K(user_schema_version));

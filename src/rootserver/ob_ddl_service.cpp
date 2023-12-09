@@ -22017,32 +22017,47 @@ int ObDDLService::create_tenant(
       // create ls/tablet/schema in tenant space
       
       ObArray<ObResourcePoolName> pools;
+      std::vector<std::thread> ths;
       if (OB_FAIL(get_pools(arg.pool_list_, pools))) {
         LOG_WARN("get_pools failed", KR(ret), K(arg));
       } else if (OB_FAIL(create_tenant_sys_ls(meta_tenant_schema, pools, false, meta_palf_base_info))) {
         LOG_WARN("fail to create tenant sys ls", KR(ret));
       } else if (OB_FAIL(create_tenant_sys_ls(user_tenant_schema, pools, false, user_palf_base_info))) {
         LOG_WARN("fail to create tenant sys ls", KR(ret));  
-      } else if (OB_FAIL(create_normal_tenant(user_tenant_id, pools, user_tenant_schema, tenant_role,
-        recovery_until_scn, user_sys_variable, false/*create_ls_with_palf*/, user_palf_base_info, init_configs,
-        arg.is_creating_standby_, arg.log_restore_source_))) {
-        LOG_WARN("fail to create user tenant", KR(ret), K(user_tenant_id), K(pools), K(user_sys_variable),
-            K(tenant_role), K(recovery_until_scn), K(user_palf_base_info), K(init_configs));
-      } else if (OB_FAIL(create_tenant_end(user_tenant_id))) {
-            LOG_WARN("failed to create tenant end", KR(ret), K(user_tenant_id));
       } else {
-        ObString empty_str;
-        DEBUG_SYNC(BEFORE_CREATE_USER_TENANT);
-        if (OB_FAIL(create_normal_tenant(meta_tenant_id, pools, meta_tenant_schema, tenant_role,
-              recovery_until_scn, meta_sys_variable, create_ls_with_palf, meta_palf_base_info, init_configs,
-              false /* is_creating_standby */, empty_str))) {
-          LOG_WARN("fail to create meta tenant", KR(ret), K(meta_tenant_id), K(pools), K(meta_sys_variable),
-              K(tenant_role), K(recovery_until_scn), K(meta_palf_base_info));
+        // create_normal_tenant_in_parallel
+        ths.emplace_back([&,this](){
+          set_thread_name("create_normal_meta",0);
+          if (OB_FAIL(create_normal_tenant(meta_tenant_id, pools, meta_tenant_schema, tenant_role,
+            recovery_until_scn, meta_sys_variable, create_ls_with_palf, meta_palf_base_info, init_configs,
+            arg.is_creating_standby_, arg.log_restore_source_))) {
+            LOG_WARN("fail to create meta tenant", KR(ret), K(meta_tenant_id), K(pools), K(meta_sys_variable),
+                K(tenant_role), K(recovery_until_scn), K(meta_palf_base_info));
+          }
+        });
+        
+        ths.emplace_back([&,this](){
+          set_thread_name("create_normal_user",0);
+          if (OB_FAIL(create_normal_tenant(user_tenant_id, pools, user_tenant_schema, tenant_role,
+            recovery_until_scn, user_sys_variable, false/*create_ls_with_palf*/, user_palf_base_info, init_configs,
+            arg.is_creating_standby_, arg.log_restore_source_))) {
+            LOG_WARN("fail to create user tenant", KR(ret), K(user_tenant_id), K(pools), K(user_sys_variable),
+                K(tenant_role), K(recovery_until_scn), K(user_palf_base_info), K(init_configs));
+          }
+        });
+        for(auto& th : ths) {
+          th.join();
         }
-        if (FAILEDx(create_tenant_end(meta_tenant_id))) {
-            LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
+        
+        if (OB_FAIL(create_tenant_end(user_tenant_id))) {
+            LOG_WARN("failed to create tenant end", KR(ret), K(user_tenant_id));
+        } else if (OB_FAIL(create_tenant_end(meta_tenant_id))) {
+          LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
         }
+        
       }
+      
+        
     } 
     // end HEAP_VARS_4
   }
@@ -22759,17 +22774,17 @@ int ObDDLService::create_tenant_sys_ls(
       LOG_WARN("fail to create tenant sys ls", KR(ret), K(pool_list), K(palf_base_info),
                K(locality), K(paxos_replica_num), K(tenant_schema), K(zone_priority));
     } else {
-      share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
-      int64_t timeout = GCONF.rpc_timeout;
-      if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
-        timeout = max(timeout, THIS_WORKER.get_timeout_remain());
-      }
-      int64_t wait_leader_start = ObTimeUtility::current_time();
-      if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
-        LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
-      }
-      int64_t wait_leader_end = ObTimeUtility::current_time();
-      wait_leader = wait_leader_end - wait_leader_end;
+      // share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
+      // int64_t timeout = GCONF.rpc_timeout;
+      // if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
+      //   timeout = max(timeout, THIS_WORKER.get_timeout_remain());
+      // }
+      // int64_t wait_leader_start = ObTimeUtility::current_time();
+      // if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
+      //   LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
+      // }
+      // int64_t wait_leader_end = ObTimeUtility::current_time();
+      // wait_leader = wait_leader_end - wait_leader_end;
     }
   }
   if (is_meta_tenant(tenant_id)) {
@@ -23334,7 +23349,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     }
   });
   
-  int64_t batch_count = data_tables.count() / 15;
+  int64_t batch_count = data_tables.count() / 14;
   int begin = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
     if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
@@ -23370,7 +23385,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     th.join();
   }
   
-  batch_count = other_tables.count() / 16;
+  batch_count = other_tables.count() / 15;
   begin = 0;
   ths.clear();
   for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {
