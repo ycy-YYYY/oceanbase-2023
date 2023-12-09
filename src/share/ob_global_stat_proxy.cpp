@@ -99,6 +99,7 @@ int ObGlobalStatProxy::set_tenant_init_global_stat(
     if (OB_FAIL(update(list))) {
       LOG_WARN("update failed", KR(ret), K(list));
     }
+    LOG_INFO("set_tenant_init_global_stat", KR(ret), K(list));
   }
   LOG_INFO("set_tenant_init_global_stat", KR(ret),
            "costYcy", ObTimeUtility::current_time() - begin_time);

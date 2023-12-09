@@ -100,6 +100,27 @@ void ObCommonLSService::do_work()
             LOG_WARN("failed to modify ls unit group", KR(ret), KR(tmp_ret), K(user_tenant_schema));
           }
         }
+      } else {
+        const uint64_t user_tenant_id = 1002;
+        if (OB_FAIL(check_can_do_recovery_(user_tenant_id))) {
+          LOG_WARN("can not do recovery now", KR(ret), K(user_tenant_id));
+        } else if (OB_FAIL(get_tenant_schema(user_tenant_id, user_tenant_schema))) {
+          LOG_WARN("failed to get user tenant schema", KR(ret), K(user_tenant_id));
+        } else if (user_tenant_schema.is_dropping()) {
+          if (OB_TMP_FAIL(try_force_drop_tenant_(user_tenant_schema))) {
+            LOG_WARN("failed to force drop tenant", KR(ret), KR(tmp_ret), K(user_tenant_id));
+          }
+        } else if (OB_TMP_FAIL(try_create_ls_(user_tenant_schema))) {
+          LOG_WARN("failed to create ls", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+        }
+        if (OB_SUCC(ret) && !user_tenant_schema.is_dropping()) {
+          if (OB_TMP_FAIL(ObBalanceLSPrimaryZone::try_adjust_user_ls_primary_zone(user_tenant_schema))) {
+            LOG_WARN("failed to adjust user tenant primary zone", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+          }
+          if (OB_TMP_FAIL(try_modify_ls_unit_group_(user_tenant_schema))) {
+            LOG_WARN("failed to modify ls unit group", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+          }
+        }
       }
 
       if (OB_TMP_FAIL(ObBalanceLSPrimaryZone::try_update_sys_ls_primary_zone(tenant_id_))) {

@@ -11,6 +11,7 @@
  */
 
 #include "common/ob_timeout_ctx.h"
+#include "lib/oblog/ob_log_module.h"
 #include "share/ob_share_util.h"
 #define USING_LOG_PREFIX SHARE
 #include "ob_ls_creator.h"
@@ -719,6 +720,7 @@ int ObLSCreator::set_member_list_(const common::ObMemberList &member_list,
   int ret = OB_SUCCESS;
   ObArray<common::ObAddr> server_list;
   int tmp_ret = OB_SUCCESS;
+  LOG_INFO("start to set member list", K_(id), K_(tenant_id), K(member_list));
   if (OB_UNLIKELY(!is_valid())) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", KR(ret));
@@ -726,8 +728,6 @@ int ObLSCreator::set_member_list_(const common::ObMemberList &member_list,
                          || member_list.get_member_number() < rootserver::majority(paxos_replica_num))) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", KR(ret), K(member_list), K(paxos_replica_num));
-  } else if (!is_sys_tenant(tenant_id_) && OB_FAIL(check_member_list_and_learner_list_all_in_meta_table_(member_list, learner_list))) {
-    LOG_WARN("fail to check member_list all in meta table", KR(ret), K(member_list), K(learner_list), K_(tenant_id), K_(id));
   } else {
     ObTimeoutCtx ctx;
     if (OB_FAIL(ObShareUtil::set_default_timeout_ctx(ctx, GCONF.rpc_timeout))) {

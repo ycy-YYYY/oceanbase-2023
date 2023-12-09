@@ -10,7 +10,10 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
+#include "lib/utility/ob_macro_utils.h"
+#include "share/ob_tenant_role.h"
 #include <memory>
 #include <vector>
 #include <thread>
@@ -22012,42 +22015,36 @@ int ObDDLService::create_tenant(
     } else {
       DEBUG_SYNC(BEFORE_CREATE_META_TENANT);
       // create ls/tablet/schema in tenant space
+      
       ObArray<ObResourcePoolName> pools;
       if (OB_FAIL(get_pools(arg.pool_list_, pools))) {
         LOG_WARN("get_pools failed", KR(ret), K(arg));
-      } else if (OB_FAIL(create_normal_tenant(meta_tenant_id, pools, meta_tenant_schema, tenant_role,
-        recovery_until_scn, meta_sys_variable, false/*create_ls_with_palf*/, meta_palf_base_info, init_configs,
+      } else if (OB_FAIL(create_tenant_sys_ls(meta_tenant_schema, pools, false, meta_palf_base_info))) {
+        LOG_WARN("fail to create tenant sys ls", KR(ret));
+      } else if (OB_FAIL(create_tenant_sys_ls(user_tenant_schema, pools, false, user_palf_base_info))) {
+        LOG_WARN("fail to create tenant sys ls", KR(ret));  
+      } else if (OB_FAIL(create_normal_tenant(user_tenant_id, pools, user_tenant_schema, tenant_role,
+        recovery_until_scn, user_sys_variable, false/*create_ls_with_palf*/, user_palf_base_info, init_configs,
         arg.is_creating_standby_, arg.log_restore_source_))) {
-        LOG_WARN("fail to create meta tenant", KR(ret), K(meta_tenant_id), K(pools), K(meta_sys_variable),
-            K(tenant_role), K(recovery_until_scn), K(meta_palf_base_info), K(init_configs));
+        LOG_WARN("fail to create user tenant", KR(ret), K(user_tenant_id), K(pools), K(user_sys_variable),
+            K(tenant_role), K(recovery_until_scn), K(user_palf_base_info), K(init_configs));
+      } else if (OB_FAIL(create_tenant_end(user_tenant_id))) {
+            LOG_WARN("failed to create tenant end", KR(ret), K(user_tenant_id));
       } else {
         ObString empty_str;
         DEBUG_SYNC(BEFORE_CREATE_USER_TENANT);
-        if (OB_FAIL(create_normal_tenant(user_tenant_id, pools, user_tenant_schema, tenant_role,
-              recovery_until_scn, user_sys_variable, create_ls_with_palf, user_palf_base_info, init_configs,
+        if (OB_FAIL(create_normal_tenant(meta_tenant_id, pools, meta_tenant_schema, tenant_role,
+              recovery_until_scn, meta_sys_variable, create_ls_with_palf, meta_palf_base_info, init_configs,
               false /* is_creating_standby */, empty_str))) {
-          LOG_WARN("fail to create user tenant", KR(ret), K(user_tenant_id), K(pools), K(user_sys_variable),
-              K(tenant_role), K(recovery_until_scn), K(user_palf_base_info));
+          LOG_WARN("fail to create meta tenant", KR(ret), K(meta_tenant_id), K(pools), K(meta_sys_variable),
+              K(tenant_role), K(recovery_until_scn), K(meta_palf_base_info));
+        }
+        if (FAILEDx(create_tenant_end(meta_tenant_id))) {
+            LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
         }
       }
-      // drop tenant if create tenant failed.
-      // meta tenant will be force dropped with its user tenant.
-      if (OB_FAIL(ret) && tenant_role.is_primary()) {
-        //tenant_id can not fallback, so can not drop tenant in standby cluster
-        int temp_ret = OB_SUCCESS;
-        if (OB_SUCCESS != (temp_ret = try_force_drop_tenant(user_tenant_schema))) {
-          LOG_WARN("fail to force drop tenant", KR(ret), KR(temp_ret), K(user_tenant_schema));
-        }
-      }
-    }
-  } // end HEAP_VARS_4
-  if (FAILEDx(create_tenant_end(meta_tenant_id))) {
-    LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
-  } else if (!tenant_role.is_primary()) {
-    LOG_INFO("restore or standby user tenant cannot create end", K(tenant_role),
-        K(user_tenant_id), K(arg));
-  } else if (OB_FAIL(create_tenant_end(user_tenant_id))) {
-    LOG_WARN("failed to create tenant end", KR(ret), K(user_tenant_id));
+    } 
+    // end HEAP_VARS_4
   }
 
   if (OB_SUCC(ret)) {
@@ -22209,6 +22206,16 @@ int ObDDLService::create_tenant_schema(
       }
       LOG_INFO("[CREATE_TENANT] STEP 1.3. finish persist tenant config",
                KR(ret), K(user_tenant_id), "cost", ObTimeUtility::fast_current_time() - tmp_start_time);
+    }
+    
+    if (OB_SUCC(ret)) {
+      ObAllTenantInfo tenant_info;
+      if (OB_FAIL(tenant_info.init(user_tenant_id, share::PRIMARY_TENANT_ROLE , NORMAL_SWITCHOVER_STATUS, 0,
+                SCN::base_scn(), SCN::base_scn(), SCN::base_scn(), SCN::max_scn()))) {
+        LOG_WARN("failed to init tenant info", KR(ret));
+      } else if (OB_FAIL(ObAllTenantInfoProxy::init_tenant_info(tenant_info, &trans))) {
+        LOG_WARN("failed to init tenant info", KR(ret), K(tenant_info));
+      }
     }
 
     if (trans.is_started()) {
@@ -22616,8 +22623,6 @@ int ObDDLService::create_normal_tenant(
     LOG_WARN("tenant_id is invalid", KR(ret), K(tenant_id));
   } else if (OB_FAIL(insert_restore_tenant_job(tenant_id, tenant_schema.get_tenant_name(), tenant_role))) {
     LOG_WARN("failed to insert restore tenant job", KR(ret), K(tenant_id), K(tenant_role), K(tenant_schema));
-  } else if (OB_FAIL(create_tenant_sys_ls(tenant_schema, pool_list, create_ls_with_palf, palf_base_info))) {
-    LOG_WARN("fail to create tenant sys log stream", KR(ret), K(tenant_schema), K(pool_list), K(palf_base_info));
   } else if (is_user_tenant(tenant_id) && !tenant_role.is_primary()) {
     //standby cluster no need create sys tablet and init tenant schema
   } else if (OB_FAIL(ObSchemaUtils::construct_inner_table_schemas(tenant_id, tables))) {
@@ -22754,17 +22759,17 @@ int ObDDLService::create_tenant_sys_ls(
       LOG_WARN("fail to create tenant sys ls", KR(ret), K(pool_list), K(palf_base_info),
                K(locality), K(paxos_replica_num), K(tenant_schema), K(zone_priority));
     } else {
-      // share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
-      // int64_t timeout = GCONF.rpc_timeout;
-      // if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
-      //   timeout = max(timeout, THIS_WORKER.get_timeout_remain());
-      // }
-      // int64_t wait_leader_start = ObTimeUtility::current_time();
-      // if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
-      //   LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
-      // }
-      // int64_t wait_leader_end = ObTimeUtility::current_time();
-      // wait_leader = wait_leader_end - wait_leader_end;
+      share::ObLSLeaderElectionWaiter ls_leader_waiter(*lst_operator_, stopped_);
+      int64_t timeout = GCONF.rpc_timeout;
+      if (INT64_MAX != THIS_WORKER.get_timeout_ts()) {
+        timeout = max(timeout, THIS_WORKER.get_timeout_remain());
+      }
+      int64_t wait_leader_start = ObTimeUtility::current_time();
+      if (OB_FAIL(ls_leader_waiter.wait(tenant_id, SYS_LS, timeout))) {
+        LOG_WARN("fail to wait election leader", KR(ret), K(tenant_id), K(SYS_LS), K(timeout));
+      }
+      int64_t wait_leader_end = ObTimeUtility::current_time();
+      wait_leader = wait_leader_end - wait_leader_end;
     }
   }
   if (is_meta_tenant(tenant_id)) {
@@ -23116,7 +23121,7 @@ int ObDDLService::init_tenant_schema(
       }
     }
     
-    LOG_INFO("costYcy", "cost", ObTimeUtility::fast_current_time() - start_time, "tenant_id", tenant_id);
+    LOG_INFO("costYcy", "cost", ObTimeUtility::fast_current_time() - start_time, "tenant_id", tenant_id,K(ret));
     
     // 2. init tenant schema
     if (OB_SUCC(ret)) {

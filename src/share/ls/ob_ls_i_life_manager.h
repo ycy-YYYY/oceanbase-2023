@@ -13,6 +13,7 @@
 #ifndef OCEANBASE_SHARE_OB_LS_I_LIFE_MANAGER_H_
 #define OCEANBASE_SHARE_OB_LS_I_LIFE_MANAGER_H_
 
+#include "lib/ob_define.h"
 #include "share/ob_share_util.h"
 #include "share/ob_tenant_switchover_status.h"//ObTenantSwitchoverStatus
 #include "common/ob_timeout_ctx.h"
@@ -131,7 +132,7 @@ public:
    * */
   static uint64_t get_exec_tenant_id(const uint64_t tenant_id)
   {
-    return get_private_table_exec_tenant_id(tenant_id);
+    return OB_SYS_TENANT_ID;
   }
 
 private:
