@@ -11,6 +11,7 @@
  */
 
 #include "ob_gti_source.h"
+#include "lib/oblog/ob_log_module.h"
 #include "ob_trans_service.h"
 #include "ob_gti_rpc.h"
 #include "ob_trans_factory.h"
@@ -234,6 +235,7 @@ int ObGtiSource::get_trans_id(int64_t &trans_id)
       }
     }
   }
+  TRANS_LOG(INFO,"get_trans_id",KR(save_ret),K(MTL_ID()));
   return save_ret;
 }
 

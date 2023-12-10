@@ -10,6 +10,8 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/ob_define.h"
+#include "lib/oblog/ob_log_module.h"
 #define USING_LOG_PREFIX RS
 #include "ob_common_ls_service.h"
 #include "ob_ls_service_helper.h"
@@ -80,7 +82,28 @@ void ObCommonLSService::do_work()
       ret = OB_SUCCESS;
       ObCurTraceId::init(GCONF.self_addr_);
       if (is_meta_tenant(tenant_id_)) {
-        const uint64_t user_tenant_id = gen_user_tenant_id(tenant_id_);
+        // const uint64_t user_tenant_id = gen_user_tenant_id(tenant_id_);
+        // if (OB_FAIL(check_can_do_recovery_(user_tenant_id))) {
+        //   LOG_WARN("can not do recovery now", KR(ret), K(user_tenant_id));
+        // } else if (OB_FAIL(get_tenant_schema(user_tenant_id, user_tenant_schema))) {
+        //   LOG_WARN("failed to get user tenant schema", KR(ret), K(user_tenant_id));
+        // } else if (user_tenant_schema.is_dropping()) {
+        //   if (OB_TMP_FAIL(try_force_drop_tenant_(user_tenant_schema))) {
+        //     LOG_WARN("failed to force drop tenant", KR(ret), KR(tmp_ret), K(user_tenant_id));
+        //   }
+        // } else if (OB_TMP_FAIL(try_create_ls_(user_tenant_schema))) {
+        //   LOG_WARN("failed to create ls", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+        // }
+        // if (OB_SUCC(ret) && !user_tenant_schema.is_dropping()) {
+        //   if (OB_TMP_FAIL(ObBalanceLSPrimaryZone::try_adjust_user_ls_primary_zone(user_tenant_schema))) {
+        //     LOG_WARN("failed to adjust user tenant primary zone", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+        //   }
+        //   if (OB_TMP_FAIL(try_modify_ls_unit_group_(user_tenant_schema))) {
+        //     LOG_WARN("failed to modify ls unit group", KR(ret), KR(tmp_ret), K(user_tenant_schema));
+        //   }
+        // }
+      } else if ( is_sys_tenant(tenant_id_ )){
+        const uint64_t user_tenant_id = 1002;
         if (OB_FAIL(check_can_do_recovery_(user_tenant_id))) {
           LOG_WARN("can not do recovery now", KR(ret), K(user_tenant_id));
         } else if (OB_FAIL(get_tenant_schema(user_tenant_id, user_tenant_schema))) {
@@ -117,6 +140,7 @@ void ObCommonLSService::do_work()
 int ObCommonLSService::try_create_ls_(const share::schema::ObTenantSchema &tenant_schema)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("try_create_ls_",K(tenant_id_),K(tenant_schema.get_tenant_id()));
   const uint64_t tenant_id = tenant_schema.get_tenant_id();
   if (OB_ISNULL(GCTX.sql_proxy_)) {
     ret = OB_ERR_UNEXPECTED;

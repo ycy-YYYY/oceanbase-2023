@@ -1565,20 +1565,13 @@ int ObDDLOperator::batch_create_core_tables(ObIArray<ObTableSchema> &table_schem
   int ret = OB_SUCCESS;
   int64_t begin_time = ObTimeUtility::current_time();
   const uint64_t tenant_id = table_schemas.at(0).get_tenant_id();
-  int64_t new_schema_version = OB_INVALID_VERSION;
   ObSchemaService *schema_service = schema_service_.get_schema_service();
-  ObSchemaGetterGuard schema_guard;
   if (OB_ISNULL(schema_service)) {
     ret = OB_ERR_SYS;
     RS_LOG(ERROR, "schema_service must not null");
-  } else if (OB_FAIL(schema_service_.get_tenant_schema_guard(tenant_id, schema_guard))) {
-    LOG_WARN("failed to get schema guard", K(ret));
-  } else if (OB_FAIL(schema_service_.gen_new_schema_version(tenant_id, new_schema_version))) {
-    LOG_WARN("fail to gen new schema_version", K(ret), K(tenant_id));
   } else {
     for (int i = 0; i < table_schemas.count() - 1; ++i){
       ObTableSchema &table_schema = table_schemas.at(i);
-      table_schema.set_schema_version(new_schema_version);
       if (OB_FAIL(schema_service->get_table_sql_service().create_table_without_log(
         table_schema,
         trans,
@@ -1588,15 +1581,37 @@ int ObDDLOperator::batch_create_core_tables(ObIArray<ObTableSchema> &table_schem
         RS_LOG(WARN, "failed to create table", K(ret));
       }
     }
-    ObTableSchema &table_schema = table_schemas.at(table_schemas.count() - 1);
-    table_schema.set_schema_version(new_schema_version);
     
-    if (OB_FAIL(create_table(table_schema, trans,nullptr,true,false))){
+    ObTableSchema &table_schema = table_schemas.at(table_schemas.count() - 1);
+    
+    if (OB_FAIL(create_table(table_schema, trans,nullptr,false,false))){
       RS_LOG(WARN, "failed to create table", K(ret));
     }
     LOG_INFO("batch create core tables", K(table_schemas.count()), K(tenant_id),
              "cost_time", ObTimeUtility::current_time() - begin_time);
     // set core schema version
+  }
+  return ret;
+}
+
+int ObDDLOperator::create_table_without_log(share::schema::ObTableSchema &table_schema,
+                           common::ObMySQLTransaction &trans,
+                           const common::ObString *ddl_stmt_str,
+                           const bool need_sync_schema_version,
+                           const bool is_truncate_table)
+                           
+{
+  int ret = OB_SUCCESS;
+  const uint64_t tenant_id = table_schema.get_tenant_id();
+  ObSchemaService *schema_service = schema_service_.get_schema_service();
+  
+  if (OB_FAIL(schema_service->get_table_sql_service().create_table_without_log(
+    table_schema,
+    trans,
+    ddl_stmt_str,
+    need_sync_schema_version,
+    is_truncate_table))) {
+    RS_LOG(WARN, "failed to create table", K(ret));
   }
   return ret;
 }
@@ -5222,16 +5237,7 @@ int ObDDLOperator::init_tenant_env(
     }
   }
 
-  if (OB_SUCC(ret) && is_meta_tenant(tenant_id)) {
-    const uint64_t user_tenant_id = gen_user_tenant_id(tenant_id);
-    ObAllTenantInfo tenant_info;
-    if (OB_FAIL(tenant_info.init(user_tenant_id, tenant_role, NORMAL_SWITCHOVER_STATUS, 0,
-                SCN::base_scn(), SCN::base_scn(), SCN::base_scn(), recovery_until_scn))) {
-      LOG_WARN("failed to init tenant info", KR(ret), K(tenant_id), K(tenant_role));
-    } else if (OB_FAIL(ObAllTenantInfoProxy::init_tenant_info(tenant_info, &trans))) {
-      LOG_WARN("failed to init tenant info", KR(ret), K(tenant_info));
-    }
-  }
+
   LOG_INFO("init tenant env", K(ret), K(tenant_id),
            "costYcy", ObTimeUtility::current_time() - begin_ts);
   return ret;

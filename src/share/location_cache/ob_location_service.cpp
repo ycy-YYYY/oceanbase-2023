@@ -10,6 +10,7 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/ob_errno.h"
 #define USING_LOG_PREFIX SHARE_LOCATION
 
 #include "share/location_cache/ob_location_service.h"

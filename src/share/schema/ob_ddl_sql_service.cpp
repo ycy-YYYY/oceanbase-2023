@@ -126,6 +126,8 @@ int ObDDLSqlService::log_operation(
       }
     }
   }
+  
+  LOG_INFO("log ddl operation DDL", K(schema_operation), K(sql_tenant_id), K(sql_exec_tenant_id), K(ret));
 
   return ret;
 }

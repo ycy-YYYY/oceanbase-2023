@@ -56,6 +56,7 @@ int check_sys_var_options(ObExecContext &ctx,
 int ObCreateTenantExecutor::execute(ObExecContext &ctx, ObCreateTenantStmt &stmt)
 {
   int ret = OB_SUCCESS;
+  int tmp_ret = OB_SUCCESS;
   int64_t start_ts = ObTimeUtility::current_time();
   ObTaskExecutorCtx *task_exec_ctx = NULL;
   obrpc::ObCommonRpcProxy *common_rpc_proxy = NULL;
@@ -90,7 +91,7 @@ int ObCreateTenantExecutor::execute(ObExecContext &ctx, ObCreateTenantStmt &stmt
   } else if (OB_ISNULL(common_rpc_proxy = task_exec_ctx->get_common_rpc())) {
     ret = OB_NOT_INIT;
     LOG_WARN("get common rpc proxy failed");
-  } else if (OB_FAIL(common_rpc_proxy->create_tenant(create_tenant_arg, tenant_id))) {
+  } else if (OB_TMP_FAIL(common_rpc_proxy->create_tenant(create_tenant_arg, tenant_id))) {
     LOG_WARN("rpc proxy create tenant failed", K(ret));
   } else if (!create_tenant_arg.if_not_exist_ && OB_INVALID_ID == tenant_id) {
     ret = OB_ERR_UNEXPECTED;
@@ -135,12 +136,6 @@ int ObCreateTenantExecutor::wait_schema_refreshed_(const uint64_t tenant_id)
     } else {
       int tmp_ret = OB_SUCCESS;
       if (OB_TMP_FAIL(GSCHEMASERVICE.get_tenant_refreshed_schema_version(
-          meta_tenant_id, meta_schema_version))) {
-        if (OB_ENTRY_NOT_EXIST != tmp_ret) {
-          ret = tmp_ret;
-          LOG_WARN("get refreshed schema version failed", KR(ret), K(meta_tenant_id));
-        }
-      } else if (OB_TMP_FAIL(GSCHEMASERVICE.get_tenant_refreshed_schema_version(
           user_tenant_id, user_schema_version))) {
         if (OB_ENTRY_NOT_EXIST != tmp_ret) {
           ret = tmp_ret;
@@ -148,8 +143,7 @@ int ObCreateTenantExecutor::wait_schema_refreshed_(const uint64_t tenant_id)
         }
       }
       if (OB_FAIL(ret)) {
-      } else if (ObSchemaService::is_formal_version(meta_schema_version)
-                 && ObSchemaService::is_formal_version(user_schema_version)) {
+      } else if (ObSchemaService::is_formal_version(user_schema_version)) {
         break;
       } else {
         LOG_INFO("wait schema refreshed", K(tenant_id), K(meta_schema_version), K(user_schema_version));

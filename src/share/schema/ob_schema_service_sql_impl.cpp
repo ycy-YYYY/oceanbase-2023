@@ -2881,6 +2881,7 @@ int ObSchemaServiceSQLImpl::check_sys_schema_change(
     bool &sys_schema_change)
 {
   int ret = OB_SUCCESS;
+  
   const uint64_t tenant_id = schema_status.tenant_id_;
   SMART_VAR(ObMySQLProxy::MySQLResult, res) {
     ObMySQLResult *result = NULL;
@@ -2907,6 +2908,8 @@ int ObSchemaServiceSQLImpl::check_sys_schema_change(
           }
         }
       }
+      
+      LOG_INFO("check sys schema change", K(sql), K(schema_version), K(new_schema_version));
 
       const int64_t snapshot_timestamp = schema_status.snapshot_timestamp_;
       DEFINE_SQL_CLIENT_RETRY_WEAK_WITH_SNAPSHOT(sql_client, snapshot_timestamp);
@@ -2919,11 +2922,13 @@ int ObSchemaServiceSQLImpl::check_sys_schema_change(
       } else if (OB_FAIL(result->next())) {
         if (OB_ITER_END == ret) {
           sys_schema_change = false;
+          LOG_INFO("no sys schema change", K(schema_version), K(new_schema_version));
           ret = OB_SUCCESS;
         } else {
           LOG_WARN("next failed", K(ret));
         }
       } else {
+        LOG_INFO("sys schema change", K(schema_version), K(new_schema_version));
         sys_schema_change = true;
       }
     }

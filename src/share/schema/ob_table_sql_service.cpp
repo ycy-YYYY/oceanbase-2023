@@ -4247,6 +4247,8 @@ int ObTableSqlService::log_core_operation(
     LOG_WARN("set_core_schema_version failed", KR(ret), K(tenant_id),
              "core_schema_version", schema_version);
   }
+  
+  LOG_INFO("log_core_operation DDL", KR(ret), K(tenant_id), K(schema_version));
   return ret;
 }
 
