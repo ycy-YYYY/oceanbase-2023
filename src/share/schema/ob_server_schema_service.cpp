@@ -5390,6 +5390,7 @@ int ObServerSchemaService::refresh_full_schema(
 
         // refresh sys table schemas
         if (OB_SUCC(ret) && !core_schema_change && sys_schema_change) {
+          LOG_INFO("start to refresh sys schema", K(schema_status));
           if (OB_FAIL(get_schema_version_in_inner_table(sql_client, schema_status, schema_version))) {
             LOG_WARN("fail to get schema version in inner table", KR(ret), K(schema_status));
           } else if (schema_version <= OB_CORE_SCHEMA_VERSION + 1) {
@@ -5411,6 +5412,7 @@ int ObServerSchemaService::refresh_full_schema(
               local_schema_version, schema_version, sys_schema_change))) {
             LOG_WARN("check_sys_schema_change failed", KR(ret), K(schema_status), K(schema_version));
           } else if (sys_schema_change) {
+            LOG_INFO("sys schema version change");
             // for sys table schema, we publish as sys_temp_version
             const int64_t sys_formal_version = std::max(core_schema_version, schema_version);
             int64_t publish_version = 0;
@@ -5883,6 +5885,7 @@ int ObServerSchemaService::try_fetch_publish_sys_schemas(
     bool &sys_schema_change)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("try_fetch_publish_sys_schemas", K(schema_status), K(schema_version), K(publish_version));
   const uint64_t tenant_id = schema_status.tenant_id_;
   if (!check_inner_stat()) {
     ret = OB_INNER_STAT_ERROR;
@@ -6448,6 +6451,7 @@ int ObServerSchemaService::check_core_schema_change_(
     bool &core_schema_change)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("check core schema change", K(schema_status), K(core_schema_version));
   int64_t new_core_schema_version = OB_INVALID_VERSION;
   if (!check_inner_stat()) {
     ret = OB_INNER_STAT_ERROR;
@@ -6474,6 +6478,7 @@ int ObServerSchemaService::check_sys_schema_change(
     bool &sys_schema_change)
 {
   int ret = OB_SUCCESS;
+  LOG_INFO("check sys schema change", K(schema_status), K(schema_version), K(new_schema_version));
   ObArray<uint64_t> table_ids;
   if (!check_inner_stat()) {
     ret = OB_INNER_STAT_ERROR;
