@@ -597,7 +597,7 @@ int ObBootstrap::execute_bootstrap(rootserver::ObServerZoneOpService &server_zon
     LOG_WARN("construct all schema fail", K(ret));
   } else if (OB_FAIL(broadcast_sys_schema(table_schemas))) {
     LOG_WARN("broadcast_sys_schemas failed", K(table_schemas), K(ret));
-  } else if (OB_FAIL(create_all_partitions_async())) {
+  } else if (OB_FAIL(create_all_partitions())) {
     LOG_WARN("create all partitions fail", K(ret));
   } else if (OB_FAIL(create_all_schema(ddl_service_, table_schemas))) {
     LOG_WARN("create_all_schema failed",  K(table_schemas), K(ret));
