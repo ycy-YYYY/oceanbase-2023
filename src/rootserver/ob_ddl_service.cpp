@@ -10,10 +10,14 @@
  * See the Mulan PubL v2 for more details.
  */
 
+#include "lib/ob_define.h"
 #include "lib/oblog/ob_log_module.h"
 #include "lib/thread/ob_thread_name.h"
 #include "lib/utility/ob_macro_utils.h"
 #include "share/ob_tenant_role.h"
+#include "share/schema/ob_schema_getter_guard.h"
+#include "share/schema/ob_schema_service.h"
+#include <cstdint>
 #include <memory>
 #include <vector>
 #include <thread>
@@ -23308,16 +23312,28 @@ int ObDDLService::parallel_create_sys_table_schemas(
   int64_t finish_cnt = 0;
   ObCurTraceId::TraceId *cur_trace_id = ObCurTraceId::get_trace_id();
   
+  ObSchemaService *schema_service = schema_service_->get_schema_service();
+  ObSchemaGetterGuard schema_guard;
+  if (OB_FAIL(schema_service_->get_tenant_schema_guard(tenant_id, schema_guard))) {
+    LOG_WARN("fail to get schema guard", KR(ret), K(tenant_id));
+  }
+  
+  int64_t schema_version = OB_INVALID_VERSION;
+  if (OB_FAIL(schema_guard.get_schema_version(tenant_id, schema_version))) {
+    LOG_WARN("fail to get schema version", KR(ret), K(tenant_id));
+  }
+  
   ObSArray<ObTableSchema> core_tables;
   ObSArray<ObTableSchema> other_tables;
   ObSArray<ObTableSchema> data_tables;
   for (int64_t i = 0; OB_SUCC(ret) && i < table_schemas.count(); ++i) {
       ObTableSchema &table = table_schemas.at(i);
+      table.set_schema_version(schema_version);
       if (is_core_table(table.get_table_id())) {
         if (OB_FAIL(core_tables.push_back(table))) {
           LOG_WARN("fail to push back core table", KR(ret), K(table));
         }
-      } else if (!(table.is_index_table() || table.is_materialized_view() || table.is_aux_vp_table() || table.is_aux_lob_table())) {
+      } else if (is_sys_table(table.get_table_id())) {
         if (OB_FAIL(data_tables.push_back(table))) {
           LOG_WARN("fail to push back data table", KR(ret), K(table));
         }
@@ -23349,7 +23365,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     }
   });
   
-  int64_t batch_count = data_tables.count() / 14;
+  int64_t batch_count = data_tables.count() / 8;
   int begin = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
     if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
@@ -23381,13 +23397,10 @@ int ObDDLService::parallel_create_sys_table_schemas(
       }
     }
   }
-  for (auto &th : ths) {
-    th.join();
-  }
+
   
-  batch_count = other_tables.count() / 15;
+  batch_count = other_tables.count() / 6;
   begin = 0;
-  ths.clear();
   for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {
     if (other_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
       std::thread th([&, begin, i, cur_trace_id] () {
@@ -23451,10 +23464,18 @@ int ObDDLService::batch_create_sys_table_schema(
     ObTableSchema &table = tables.at(i);
     const int64_t table_id = table.get_table_id();
     const ObString &table_name = table.get_table_name();
-    if (OB_FAIL(ddl_operator.create_table(table, trans))){
-      LOG_INFO("add table schema failed", K(ret),K(table_id), K(table_name));
-      break;
+    if (i == end_idx - 1 && end_idx == tables.count()) {
+      if (OB_FAIL(ddl_operator.create_table(table, trans,nullptr,false,false))){
+        LOG_INFO("add table schema failed", K(ret),K(table_id), K(table_name));
+        break;
+      }
+    } else {
+      if (OB_FAIL(ddl_operator.create_table_without_log(table, trans))) {
+        LOG_INFO("add table schema failed", K(ret),K(table_id), K(table_name));
+        break;
+      }
     }
+    
   }
   
   if (trans.is_started()) {
