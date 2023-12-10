@@ -23349,7 +23349,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     }
   });
   
-  int64_t batch_count = data_tables.count() / 14;
+  int64_t batch_count = data_tables.count() / 8;
   int begin = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < data_tables.count(); ++i) {
     if (data_tables.count() == (i + 1) || (i + 1 - begin) >= batch_count) {
@@ -23385,7 +23385,7 @@ int ObDDLService::parallel_create_sys_table_schemas(
     th.join();
   }
   
-  batch_count = other_tables.count() / 15;
+  batch_count = other_tables.count() / 8;
   begin = 0;
   ths.clear();
   for (int64_t i = 0; OB_SUCC(ret) && i < other_tables.count(); ++i) {
