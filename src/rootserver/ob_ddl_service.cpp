@@ -22038,6 +22038,10 @@ int ObDDLService::create_tenant(
             LOG_WARN("fail to create meta tenant", KR(ret), K(meta_tenant_id), K(pools), K(meta_sys_variable),
                 K(tenant_role), K(recovery_until_scn), K(meta_palf_base_info));
           }
+          
+          if (OB_FAIL(create_tenant_end(meta_tenant_id))) {
+            LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
+          }
         });
         
         ths.emplace_back([&,this](){
@@ -22048,16 +22052,13 @@ int ObDDLService::create_tenant(
             LOG_WARN("fail to create user tenant", KR(ret), K(user_tenant_id), K(pools), K(user_sys_variable),
                 K(tenant_role), K(recovery_until_scn), K(user_palf_base_info), K(init_configs));
           }
-        });
-        for(auto& th : ths) {
-          th.join();
-        }
-        
-        if (OB_FAIL(create_tenant_end(user_tenant_id))) {
+          if (OB_FAIL(create_tenant_end(user_tenant_id))) {
             LOG_WARN("failed to create tenant end", KR(ret), K(user_tenant_id));
-        } else if (OB_FAIL(create_tenant_end(meta_tenant_id))) {
-          LOG_WARN("failed to create tenant end", KR(ret), K(meta_tenant_id));
-        }
+          } 
+        });
+        
+        ths[0].detach();
+        ths[1].join();
         
       }
       
